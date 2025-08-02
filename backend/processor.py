@@ -1,4 +1,4 @@
-from pypdf import PdfReader   
+from pypdf import PdfReader    # type: ignore
 import openai
 import re
 from typing import List, Dict, Any
@@ -338,7 +338,7 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
             print(f"✅ Created {len(modules)} learning modules")
             
             # Generate questions for each module
-            print("❓ Generating questions for each module...")
+            print("Generating questions for each module...")
             total_questions = 0
             for i, module in enumerate(modules):
                 print(f"   Processing module {i+1}/{len(modules)}: {module['title'][:50]}...")
@@ -363,7 +363,7 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
             }
             
         except Exception as e:
-            print(f"❌ Processing error: {str(e)}")
+            print(f"Processing error: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),
