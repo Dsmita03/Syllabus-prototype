@@ -109,7 +109,19 @@
     50% { box-shadow: 0 0 30px rgba(var(--primary), 0.6); }
   }
   
+  @keyframes fade-in {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes slide-up {
+    0% { opacity: 0; transform: translateY(30px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  
   .animate-gradient-x { animation: gradient-x 3s ease infinite; }
   .animate-float { animation: float 6s ease-in-out infinite; }
   .animate-glow { animation: glow 2s ease-in-out infinite; }
+  .animate-fade-in { animation: fade-in 0.8s ease-out forwards; }
+  .animate-slide-up { animation: slide-up 0.8s ease-out forwards; }
 }

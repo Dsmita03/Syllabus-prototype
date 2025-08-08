@@ -1,15 +1,9 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import {  CheckCircle, ArrowLeft, FileText, Sparkles, Zap, Brain, Target, Clock } from 'lucide-react';
-
 export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('Initializing...');
   const [error, setError] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
-   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileId = searchParams.get('fileId');
@@ -82,7 +76,7 @@ export default function ProcessingPage() {
         }
       } catch (error) {
         console.error('Processing failed:', error);
-        setError('Network error. Make sure the backend server is running on port 5001.');
+        setError('Network error.');
       }
     };
 
@@ -97,9 +91,9 @@ export default function ProcessingPage() {
           {/* Error Animation */}
           <div className="relative mb-8">
             <div className="w-24 h-24 bg-gradient-to-br from-red-400 to-orange-500 rounded-full flex items-center justify-center mx-auto animate-pulse shadow-lg">
-              <span className="text-6xl mb-6">⚠️</span>
+              <span className="text-4xl">⚠️</span>
             </div>
-            
+            <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full animate-ping"></div>
           </div>
           
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Oops! Something went wrong</h2>
@@ -121,11 +115,9 @@ export default function ProcessingPage() {
   }
 
   const currentStepData = processingSteps[currentStep] || processingSteps[processingSteps.length - 1];
-  const StepIcon = currentStepData?.icon || Sparkles;
 
   return (
-  
-  <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 relative overflow-hidden">
       {/* Enhanced Background Elements */}
       <div className="absolute inset-0">
         <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-purple-400/20 to-indigo-400/20 rounded-full blur-3xl animate-pulse"></div>
@@ -297,7 +289,3 @@ export default function ProcessingPage() {
     </div>
   );
 }
-
-
-
-
