@@ -17,6 +17,9 @@ venv.bak/
 .env
 .venv
 
+
+/data
+/uploads
 # Distribution / packaging
 .Python
 build/

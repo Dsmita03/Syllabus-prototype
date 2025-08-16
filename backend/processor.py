@@ -1,44 +1,121 @@
-from pypdf import PdfReader    # type: ignore
-import openai
+import fitz    # type: ignore - PyMuPDF
+import requests
 import re
 from typing import List, Dict, Any
 import os
+from dotenv import load_dotenv
 
-# Set your OpenAI API key here (get from openai.com)
-openai.api_key = "YOUR_OPENAI_API_KEY"  # Replace with your actual API key
+load_dotenv()
 
 class SyllabusProcessor:
     def __init__(self):
-        # Skip spaCy for now to avoid dependency issues
         self.nlp = None
-        print("SyllabusProcessor initialized (running without spaCy for better compatibility)")
+        self.perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
+        if not self.perplexity_api_key:
+            raise ValueError("PERPLEXITY_API_KEY environment variable is not set.")
+        print("SyllabusProcessor initialized with PyMuPDF and Perplexity AI")
+
+    def validate_pdf(self, file_path: str) -> bool:
+        """Validate PDF file before processing"""
+        try:
+            if not os.path.exists(file_path):
+                print(f"File does not exist: {file_path}")
+                return False
+            
+            file_size = os.path.getsize(file_path)
+            if file_size < 100:
+                print(f"File too small ({file_size} bytes): {file_path}")
+                return False
+            
+            print(f"File validation: {file_size:,} bytes")
+            
+            # Quick validation without keeping document open
+            try:
+                with fitz.open(file_path) as doc:
+                    if doc.page_count == 0:
+                        print("PDF has no pages")
+                        return False
+                    
+                    # Try to read first page
+                    first_page = doc[0]
+                    test_text = first_page.get_text()
+                    print(f"PDF validation passed: {doc.page_count} pages")
+                    return True
+                    
+            except Exception as e:
+                print(f"PDF validation failed: {e}")
+                return False
+                
+        except Exception as e:
+            print(f"PDF validation failed: {e}")
+            return False
     
     def extract_text_from_pdf(self, file_path: str) -> str:
-        """Extract text from PDF file"""
+        """Extract text from PDF file using PyMuPDF with simplified error handling"""
         try:
-            with open(file_path, 'rb') as file:
-                pdf_reader = PdfReader(file)
-                text = ""
-                for page in pdf_reader.pages:
-                    text += page.extract_text() + "\n"
-                return text
+            print(f"Starting PDF extraction: {os.path.basename(file_path)}")
+
+            # Validate PDF first
+            if not self.validate_pdf(file_path):
+                raise Exception("PDF validation failed - file may be corrupted or invalid")
+            
+            # Extract text using context manager
+            text = ""
+            successful_pages = 0
+            
+            with fitz.open(file_path) as doc:
+                print(f"Successfully opened PDF with {doc.page_count} pages")
+                
+                for page_num in range(doc.page_count):
+                    try:
+                        page = doc[page_num]
+                        page_text = page.get_text()
+                        
+                        if page_text and page_text.strip():
+                            text += f"\n--- Page {page_num + 1} ---\n"
+                            text += page_text + "\n"
+                            successful_pages += 1
+                        else:
+                            print(f"Page {page_num + 1} appears to be empty")
+                            
+                    except Exception as page_error:
+                        print(f"Error extracting page {page_num + 1}: {page_error}")
+                        continue
+            
+            print(f"Successfully processed {successful_pages} pages")
+            
+            if not text.strip():
+                raise Exception("No readable text could be extracted from the PDF")
+            
+            print(f"Text extraction complete: {len(text):,} characters extracted")
+            return text
+            
         except Exception as e:
-            raise Exception(f"Error extracting PDF text: {str(e)}")
+            print(f"PDF extraction failed: {str(e)}")
+            raise Exception(f"Error extracting PDF text with PyMuPDF: {str(e)}")
     
     def extract_text_from_txt(self, file_path: str) -> str:
         """Extract text from TXT file"""
         try:
+            print(f"Reading text file: {os.path.basename(file_path)}")
             with open(file_path, 'r', encoding='utf-8') as file:
-                return file.read()
+                content = file.read()
+            print(f"Text file read: {len(content):,} characters")
+            return content
         except Exception as e:
+            print(f"Error reading text file: {str(e)}")
             raise Exception(f"Error reading text file: {str(e)}")
     
     def _clean_content(self, content: str) -> str:
         """Clean and format module content"""
+        if not content:
+            return ""
+        
         # Remove excessive whitespace
         content = re.sub(r'\s+', ' ', content)
         # Remove page numbers and headers
         content = re.sub(r'Page \d+', '', content)
+        content = re.sub(r'--- Page \d+ ---', '', content)
         content = re.sub(r'\n+', ' ', content)
         
         # Limit content length for display
@@ -56,10 +133,13 @@ class SyllabusProcessor:
     
     def _generate_title_from_content(self, content: str) -> str:
         """Generate a meaningful title from content"""
+        if not content:
+            return "Learning Module"
+        
         # Extract first few meaningful words
         words = content.split()[:8]
         # Remove common stop words
-        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'this', 'that'}
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'this', 'that', 'page'}
         meaningful_words = [word for word in words if word.lower() not in stop_words and len(word) > 2]
         
         if meaningful_words:
@@ -71,6 +151,12 @@ class SyllabusProcessor:
         """Enhanced rule-based module division"""
         modules = []
         
+        if not text or not text.strip():
+            print("No text provided for module division")
+            return []
+        
+        print("🧩 Starting module division...")
+        
         # Enhanced patterns for better recognition
         patterns = [
             r'(?i)(?:chapter|unit|module|section|topic|lesson)\s*[:\-]?\s*\d+',  # More flexible
@@ -81,14 +167,16 @@ class SyllabusProcessor:
         ]
         
         # Try to split by patterns
-        for pattern in patterns:
+        for i, pattern in enumerate(patterns):
+            print(f"Trying pattern {i+1}: {pattern}")
             sections = re.split(f'({pattern})', text)  # Keep delimiters
             if len(sections) > 3:  # Need at least 2 modules
+                print(f"Pattern {i+1} found {len(sections)} sections")
                 modules = []
                 current_title = "Introduction"
                 current_content = ""
                 
-                for i, section in enumerate(sections):
+                for section in sections:
                     if re.match(pattern, section, re.IGNORECASE):
                         # Save previous module if exists
                         if current_content.strip():
@@ -111,16 +199,24 @@ class SyllabusProcessor:
                     })
                 
                 if modules and len(modules) >= 2:
+                    print(f"Successfully created {len(modules)} modules using pattern {i+1}")
                     break
         
         # Enhanced fallback with better content distribution
         if not modules:
+            print("No patterns found, using fallback method...")
             modules = self._create_balanced_modules(text)
         
+        # Filter out empty modules
+        modules = [m for m in modules if m['content'].strip()]
+        
+        print(f"Final result: {len(modules)} modules created")
         return modules[:6]  # Limit to 6 modules for prototype
     
     def _create_balanced_modules(self, text: str) -> List[Dict[str, Any]]:
         """Create balanced modules when no patterns are found"""
+        modules = []
+        
         # Split by paragraphs first
         paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
         
@@ -130,8 +226,7 @@ class SyllabusProcessor:
             total_sentences = len(sentences)
             modules_count = min(4, max(2, total_sentences // 15))  # 2-4 modules
             
-            sentences_per_module = total_sentences // modules_count
-            modules = []
+            sentences_per_module = total_sentences // modules_count if modules_count > 0 else total_sentences
             
             for i in range(modules_count):
                 start_idx = i * sentences_per_module
@@ -150,8 +245,7 @@ class SyllabusProcessor:
         else:
             # Use paragraph-based splitting
             modules_count = min(4, max(2, len(paragraphs) // 3))
-            paragraphs_per_module = len(paragraphs) // modules_count
-            modules = []
+            paragraphs_per_module = len(paragraphs) // modules_count if modules_count > 0 else len(paragraphs)
             
             for i in range(modules_count):
                 start_idx = i * paragraphs_per_module
@@ -171,14 +265,16 @@ class SyllabusProcessor:
         return modules
     
     def generate_questions(self, module_content: str, module_title: str) -> List[Dict[str, Any]]:
-        """Generate questions using OpenAI (with enhanced fallback for demo)"""
+        """Generate questions using Perplexity AI via requests"""
         try:
-            # If OpenAI API key is not set, use fallback questions
-            if openai.api_key == "YOUR_OPENAI_API_KEY":
+            print(f"Generating questions for: {module_title[:50]}...")
+            
+            # Check if Perplexity API key is set
+            if not self.perplexity_api_key or self.perplexity_api_key == "YOUR_PERPLEXITY_API_KEY":
+                print("🔄 Using fallback questions (no Perplexity API key)")
                 return self.get_fallback_questions(module_title)
             
-            prompt = f"""
-Based on this syllabus content about "{module_title}", generate exactly 5 questions:
+            prompt = f"""Based on this syllabus content about "{module_title}", generate exactly 5 questions:
 1. One easy multiple choice question with 4 options
 2. One medium multiple choice question with 4 options  
 3. One easy short answer question
@@ -192,28 +288,50 @@ Type: [multiple-choice/short-answer/essay]
 Difficulty: [easy/medium/hard]
 Question: [question text]
 Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple choice
----
-"""
+---"""
             
-            response = openai.Completion.create(
-                engine="text-davinci-003",
-                prompt=prompt,
-                max_tokens=800,
-                temperature=0.7
+            # Using requests to call Perplexity API
+            headers = {
+                "Authorization": f"Bearer {self.perplexity_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": "sonar-pro",
+                "messages": [
+                    {"role": "system", "content": "You are an expert educational content creator. Generate high-quality, relevant questions based on the provided syllabus content."},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 800,
+                "temperature": 0.7
+            }
+            
+            response = requests.post(
+                "https://api.perplexity.ai/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
             )
             
-            # Parse response and format questions
-            questions_text = response.choices[0].text.strip()
-            parsed_questions = self.parse_ai_questions(questions_text, module_title)
-            
-            # Ensure we have enough questions
-            if len(parsed_questions) < 3:
+            if response.status_code == 200:
+                result = response.json()
+                questions_text = result['choices'][0]['message']['content'].strip()
+                parsed_questions = self.parse_ai_questions(questions_text, module_title)
+                
+                # Ensure we have enough questions
+                if len(parsed_questions) < 3:
+                    print("AI generated too few questions, using fallback")
+                    return self.get_fallback_questions(module_title)
+                
+                print(f"Generated {len(parsed_questions)} Perplexity AI questions")
+                return parsed_questions
+            else:
+                print(f"Perplexity API error: {response.status_code} - {response.text}")
                 return self.get_fallback_questions(module_title)
             
-            return parsed_questions
-            
         except Exception as e:
-            print(f"OpenAI API error: {e}")
+            print(f"Perplexity API error: {e}")
+            print("Falling back to demo questions")
             return self.get_fallback_questions(module_title)
     
     def parse_ai_questions(self, questions_text: str, module_title: str) -> List[Dict[str, Any]]:
@@ -250,9 +368,9 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
                     question_text = line.split(':', 1)[1].strip()
                 elif line.lower().startswith('options:'):
                     options_text = line.split(':', 1)[1].strip()
-                    # Parse options (A) B) C) D) format)
-                    option_matches = re.findall(r'[A-D]\)\s*([^A-D\)]+?)(?=[A-D\)|\s*$)', options_text)
-                    options = [opt.strip() for opt in option_matches if opt.strip()]
+                    # Fixed: Better option parsing
+                    options = re.findall(r'[A-D]\)\s*([^A-D\)]+)', options_text)
+                    options = [opt.strip() for opt in options if opt.strip()]
             
             if question_text:
                 result = {
@@ -276,8 +394,8 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
     def get_fallback_questions(self, module_title: str) -> List[Dict[str, Any]]:
         """Enhanced fallback questions for demo purposes"""
         # Extract key topics from module title for more relevant questions
-        clean_title = re.sub(r'Module \d+:?', '', module_title).strip()
-        if not clean_title:
+        clean_title = re.sub(r'Module \d+:?\s*', '', module_title).strip()
+        if not clean_title or clean_title.lower() == 'page':
             clean_title = "this module"
         
         return [
@@ -316,44 +434,58 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
         ]
     
     def process_syllabus(self, file_path: str) -> Dict[str, Any]:
-        """Enhanced main processing function with progress tracking"""
+        """Enhanced main processing function with comprehensive error handling"""
         try:
-            print(f"🔄 Starting processing of: {os.path.basename(file_path)}")
+            print(f"Starting syllabus processing: {os.path.basename(file_path)}")
             
             # Extract text based on file extension
-            print("📄 Extracting text from file...")
+            print("Extracting text from file...")
             if file_path.lower().endswith('.pdf'):
                 text = self.extract_text_from_pdf(file_path)
-            else:
+            elif file_path.lower().endswith('.txt'):
                 text = self.extract_text_from_txt(file_path)
+            else:
+                raise Exception(f"Unsupported file format. Please upload PDF or TXT files only.")
             
-            if not text.strip():
-                raise Exception("No text found in the uploaded file")
-            
-            print(f"✅ Extracted {len(text):,} characters of text")
-            
+            if not text or not text.strip():
+                raise Exception("No readable text found in the uploaded file")
+
+            print(f"Text extraction successful: {len(text):,} characters extracted")
+
             # Divide into modules
-            print("🧩 Analyzing content structure and creating modules...")
+            print("Analyzing content structure and creating modules...")
             modules = self.divide_into_modules(text)
-            print(f"✅ Created {len(modules)} learning modules")
+            
+            if not modules:
+                raise Exception("Could not create any modules from the text. The file may not contain structured content.")
+            
+            print(f"Created {len(modules)} learning modules")
             
             # Generate questions for each module
             print("Generating questions for each module...")
             total_questions = 0
             for i, module in enumerate(modules):
-                print(f"   Processing module {i+1}/{len(modules)}: {module['title'][:50]}...")
+                module_title = module['title'][:50] + "..." if len(module['title']) > 50 else module['title']
+                print(f"Processing module {i+1}/{len(modules)}: {module_title}")
+                
                 module['questions'] = self.generate_questions(
                     module['content'], 
                     module['title']
                 )
                 total_questions += len(module['questions'])
             
-            print(f"🎉 Processing complete! Generated {total_questions} total questions across {len(modules)} modules")
+            print(f"Processing complete! Generated {total_questions} total questions across {len(modules)} modules")
             
             return {
                 'success': True,
                 'original_text_length': len(text),
                 'modules': modules,
+                'extraction_method': 'PyMuPDF',
+                'processing_info': {
+                    'file_name': os.path.basename(file_path),
+                    'file_size': os.path.getsize(file_path),
+                    'extraction_method': 'PyMuPDF'
+                },
                 'stats': {
                     'total_modules': len(modules),
                     'total_questions': total_questions,
@@ -363,9 +495,14 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
             }
             
         except Exception as e:
-            print(f"Processing error: {str(e)}")
+            error_message = str(e)
+            print(f"Processing failed: {error_message}")
             return {
                 'success': False,
-                'error': str(e),
-                'modules': []
+                'error': error_message,
+                'modules': [],
+                'processing_info': {
+                    'file_name': os.path.basename(file_path) if file_path else 'unknown',
+                    'error_type': type(e).__name__  # Fixed: __name__ instead of **name**
+                }
             }

@@ -1,6 +1,6 @@
 import FileUpload from '@/components/FileUpload';
 import Navbar from '@/components/Navbar';
-import { Zap, Target, ArrowRight, Upload, CheckCircle, Users, Sparkles, BookOpen } from 'lucide-react';
+import { Zap, Target, ArrowRight, Upload, CheckCircle, Users, BookOpen } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -18,12 +18,6 @@ export default function Home() {
       <main className="relative z-10 py-16 px-4">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
-            {/* Clean Badge */}
-            <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 rounded-full text-sm font-medium mb-8 border border-purple-200 shadow-lg animate-fade-in">
-              <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full animate-pulse mr-2"></div>
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI-Powered Educational Tool
-            </div>
             
             {/* Clean Main Heading */}
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-8 leading-tight animate-slide-up">
@@ -73,10 +67,6 @@ export default function Home() {
           {/* Professional Features Section */}
           <section id="features" className="mt-24">
             <div className="text-center mb-16">
-              <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 rounded-full text-sm font-medium mb-6">
-                <Sparkles className="w-4 h-4 mr-2 animate-pulse" />
-                Powerful Features
-              </div>
               <h2 className="text-4xl font-bold text-gray-900 mb-4">
                 Everything You Need for{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">

@@ -1,4 +1,4 @@
-import { BookOpen, HelpCircle, Clock } from 'lucide-react';
+import { BookOpen, HelpCircle, Clock, CheckCircle, Bookmark, Star } from 'lucide-react';
 
 interface Module {
   id: string;
@@ -18,11 +18,34 @@ interface ModuleCardProps {
   isSelected: boolean;
   onClick: () => void;
   index: number;
+  isCompleted?: boolean;
+  isBookmarked?: boolean;
+  onBookmark?: () => void;
+  onComplete?: () => void;
 }
 
-export default function ModuleCard({ module, isSelected, onClick, index }: ModuleCardProps) {
+export default function ModuleCard({ 
+  module, 
+  isSelected, 
+  onClick, 
+  index, 
+  isCompleted = false, 
+  isBookmarked = false, 
+  onBookmark, 
+  onComplete 
+}: ModuleCardProps) {
   const questionCount = module.questions?.length || 0;
   const readingTime = Math.ceil(module.content.split(' ').length / 200); // Approximate reading time
+
+  const handleBookmarkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onBookmark?.();
+  };
+
+  const handleCompleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onComplete?.();
+  };
 
   return (
     <div
@@ -44,6 +67,23 @@ export default function ModuleCard({ module, isSelected, onClick, index }: Modul
           isSelected ? 'bg-white/10' : 'bg-indigo-100'
         }`}></div>
       </div>
+
+      {/* Status Indicators */}
+      {isCompleted && (
+        <div className="absolute top-3 left-3 z-20">
+          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+            <CheckCircle className="w-5 h-5 text-white" />
+          </div>
+        </div>
+      )}
+
+      {isBookmarked && (
+        <div className="absolute top-3 right-3 z-20">
+          <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg">
+            <Bookmark className="w-4 h-4 text-white" />
+          </div>
+        </div>
+      )}
 
       <div className="relative z-10 p-6">
         {/* Header */}
@@ -104,7 +144,7 @@ export default function ModuleCard({ module, isSelected, onClick, index }: Modul
           {module.content.substring(0, 120)}...
         </p>
 
-        {/* Bottom Indicator */}
+        {/* Bottom Section with Actions */}
         <div className="mt-4 flex items-center justify-between">
           <div className={`flex items-center text-xs font-medium ${
             isSelected ? 'text-white' : 'text-purple-600'
@@ -113,9 +153,40 @@ export default function ModuleCard({ module, isSelected, onClick, index }: Modul
             Module {index + 1}
           </div>
           
-          {isSelected && (
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-          )}
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-2">
+            {onBookmark && (
+              <button
+                onClick={handleBookmarkClick}
+                className={`p-1.5 rounded-lg transition-all duration-200 ${
+                  isBookmarked
+                    ? 'bg-yellow-100 text-yellow-600'
+                    : isSelected
+                    ? 'text-white/80 hover:text-white hover:bg-white/20'
+                    : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'
+                }`}
+                title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+              </button>
+            )}
+            
+            {onComplete && (
+              <button
+                onClick={handleCompleteClick}
+                className={`p-1.5 rounded-lg transition-all duration-200 ${
+                  isCompleted
+                    ? 'bg-emerald-100 text-emerald-600'
+                    : isSelected
+                    ? 'text-white/80 hover:text-white hover:bg-white/20'
+                    : 'text-gray-400 hover:text-emerald-500 hover:bg-emerald-50'
+                }`}
+                title={isCompleted ? 'Mark as incomplete' : 'Mark as complete'}
+              >
+                <CheckCircle className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Selection Indicator */}
