@@ -16,9 +16,8 @@ class SyllabusProcessor:
             print("Warning: PERPLEXITY_API_KEY is not set. Fallback questions will be used.")
         print("SyllabusProcessor initialized with PyMuPDF and Perplexity AI")
 
-    # ----------------------------
     # File validation and extraction
-    # ----------------------------
+ 
     def validate_pdf(self, file_path: str) -> bool:
         """Validate PDF file before processing"""
         try:
@@ -98,9 +97,8 @@ class SyllabusProcessor:
             print(f"Error reading text file: {str(e)}")
             raise Exception(f"Error reading text file: {str(e)}")
 
-    # ----------------------------
     # Cleaning and titling helpers
-    # ----------------------------
+ 
     def _clean_content(self, content: str) -> str:
         """Clean and format module content"""
         if not content:
@@ -156,9 +154,8 @@ class SyllabusProcessor:
             return title if len(title) > 5 else "Course Content"
         return "Learning Module"
 
-    # ----------------------------
     # Module creation
-    # ----------------------------
+    
     def divide_into_modules(self, text: str) -> List[Dict[str, Any]]:
         """Enhanced rule-based module division"""
         modules: List[Dict[str, Any]] = []
@@ -266,9 +263,8 @@ class SyllabusProcessor:
 
         return modules
 
-    # ----------------------------
     # Question generation and parsing
-    # ----------------------------
+ 
     def generate_questions(self, module_content: str, module_title: str) -> List[Dict[str, Any]]:
         """Generate questions using Perplexity AI via requests, with graceful fallback"""
         try:
@@ -424,9 +420,8 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
             },
         ]
 
-    # ----------------------------
     # Main entry
-    # ----------------------------
+    
     def process_syllabus(self, file_path: str) -> Dict[str, Any]:
         """Enhanced main processing function with comprehensive error handling"""
         try:
@@ -495,10 +490,8 @@ Options: [A) Option 1 B) Option 2 C) Option 3 D) Option 4] - only for multiple c
                 },
             }
 
-
-# ----------------------------
 # Example usage (run as script)
-# ----------------------------
+ 
 if __name__ == "__main__":
     processor = SyllabusProcessor()
     result = processor.process_syllabus("./Syllabus.pdf")  # adjust path if needed

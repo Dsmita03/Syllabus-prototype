@@ -8,9 +8,8 @@ from processor import SyllabusProcessor
 import time
 import logging
 
-# ----------------------------
 # App setup
-# ----------------------------
+ 
 app = Flask(__name__)
 CORS(app)
 
@@ -34,10 +33,8 @@ processor = SyllabusProcessor()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-# ----------------------------
+ 
 # Helpers
-# ----------------------------
 def allowed_file(filename: str) -> bool:
     if '.' not in filename:
         return False
@@ -52,10 +49,8 @@ def find_uploaded_file_by_id(prefix_id: str) -> str | None:
             return os.path.join(folder, fname)
     return None
 
-
-# ----------------------------
 # Routes
-# ----------------------------
+ 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Simple health check endpoint"""
@@ -172,10 +167,7 @@ def get_results():
         'total_modules': len(results.get('modules', []))
     }), 200
 
-
-# ----------------------------
 # Entrypoint
-# ----------------------------
 if __name__ == '__main__':
     logger.info("Starting Syllabus API server...")
     logger.info(f"Upload folder: {UPLOAD_FOLDER}")
