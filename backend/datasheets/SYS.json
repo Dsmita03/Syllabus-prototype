@@ -1,0 +1,35 @@
+{
+  "file": "SYS.pdf",
+  "modules": [
+    {
+      "id": "module_1",
+      "title": "Introduction to Web Application",
+      "content": "Web Client, Web server, Web Application Architecture, Web Client-Server Request-Response Paradigm, Server-side Technologies: Common Gateway Interface, JEE Overview, JEE Architecture."
+    },
+    {
+      "id": "module_2",
+      "title": "Web Pages",
+      "content": "Static, Dynamic and Active Web Pages, Overview of HTML, CSS and Bootstrap, Java Applets: Applet Life Cycle, Applet API, Graphics and Event Handling in Applet."
+    },
+    {
+      "id": "module_3",
+      "title": "JavaScript",
+      "content": "Variables, Expressions, Control Statements, Arrays, Objects, Functions, Events and Validations, Regular Expressions."
+    },
+    {
+      "id": "module_4",
+      "title": "XML",
+      "content": "Introduction to XML, Document Type Definition and its attributes and entities, Namespaces and Schema, XSLT."
+    },
+    {
+      "id": "module_5",
+      "title": "JDBC",
+      "content": "Introduction to Java database connectivity, JDBC Drivers, Establishing connection, Executing query, Result processing, Database Metadata, Working with PreparedStatement, Callable Statement."
+    },
+    {
+      "id": "module_6",
+      "title": "Java Servlet",
+      "content": "Server-side programming, Servlet API, The Servlet Architecture, The Servlet Life Cycle, GET and POST, Servlet Life Cycle methods, Processing form data, Database connectivity through servlet, ServletConfig and ServletContext, Servlet chaining."
+    }
+  ]
+}
