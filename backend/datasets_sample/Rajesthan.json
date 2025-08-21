@@ -1,0 +1,115 @@
+{
+  "course_meta": {
+    "course_title": "Human Anatomy (Introductory)",
+    "institution": "Rajasthan (unspecified)",
+    "notes": "Title inferred from context; exact course code/credits not provided in excerpt."
+  },
+  "taxonomy_levels": [
+    "Remember",
+    "Understand",
+    "Apply",
+    "Analyse",
+    "Evaluate",
+    "Create"
+  ],
+  "learning_outcomes": [
+    "Introduce concepts related to general anatomy, muscular, respiratory, circulatory, digestive, and excretory systems.",
+    "Demonstrate and understand the basic anatomy of the respiratory and circulatory systems.",
+    "Demonstrate and understand the basic anatomy of the digestive and excretory systems.",
+    "Gain knowledge of the basic concepts of human body anatomical structure.",
+    "Understand interrelationships, gross, functional, and applied anatomy of various structures in the human body."
+  ],
+  "higher_order_objectives": [
+    "Analyse the respiratory system with bronchopulmonary segments and the circulatory system including types of blood vessels, heart, and pericardium.",
+    "Assess the digestive system, role of digestive juices and enzymes, and the reproductive system including spermatogenesis and oogenesis.",
+    "Formulate the excretory system pathway of glomerular filtration rate with structure of nephrons."
+  ],
+  "units": [
+    {
+      "index": 1,
+      "title": "Introduction, Musculoskeletal and Nervous Systems",
+      "topics": [
+        "Introduction to anatomy, anatomical terms, planes, organization of human body: cell, tissue, organ, organ system.",
+        "Musculoskeletal system: types of bones; structure and divisions of the skeletal system; names of bones and their parts; joints classification; structure and types of muscles.",
+        "Anatomy of the nervous system: central and peripheral nervous systems and their components."
+      ]
+    },
+    {
+      "index": 2,
+      "title": "Circulatory and Respiratory Systems",
+      "topics": [
+        "Anatomy of circulatory system: general plan and components.",
+        "Heart: size, location, coverings, chambers, blood supply, nerve supply; general plan of circulation; pulmonary circulation.",
+        "Names and positions of major arteries and veins; lymphatic system general plan.",
+        "Anatomy of the respiratory system: organs, parts, and positions (brief)."
+      ]
+    },
+    {
+      "index": 3,
+      "title": "Digestive and Excretory Systems (Part 1)",
+      "topics": [
+        "Anatomy of the digestive system.",
+        "Anatomy of the alimentary tract and its parts.",
+        "Accessory glands of digestion: pancreas, liver, gall bladder.",
+        "Anatomy of the excretory system: kidneys (location, gross structure), excretory ducts, ureters, urinary bladder, urethra."
+      ]
+    },
+    {
+      "index": 4,
+      "title": "Reproductive System",
+      "topics": [
+        "Male reproductive system.",
+        "Female reproductive system."
+      ]
+    },
+    {
+      "index": 5,
+      "title": "Endocrine System",
+      "topics": [
+        "Names and positions of all endocrine glands.",
+        "Hormones and functions: pituitary, thyroid, parathyroid, adrenal glands, gonads, islets of pancreas."
+      ]
+    }
+  ],
+  "practicals": [
+    "Demonstration of parts of microscope and its uses.",
+    "Demonstration of skeleton and joints.",
+    "Demonstration of deltoid and gluteus maximus, cubital fossa.",
+    "Clinical examination of arterial pulse.",
+    "Demonstration of body temperature."
+  ],
+  "references": [
+    {
+      "title": "Human Anatomy Regional and Applied (Vol.1–3)",
+      "author": "B.D. Chaurasia",
+      "publisher": "CBS Publishers, New Delhi",
+      "edition": "9th",
+      "year": "2022"
+    },
+    {
+      "title": "Hand Book of General Anatomy",
+      "author": "B.D. Chaurasia",
+      "publisher": "CBS Publishers, New Delhi",
+      "edition": "9th",
+      "year": "2022"
+    },
+    {
+      "title": "Text Book of Human Histology",
+      "author": "Inderbir Singh",
+      "publisher": "Jaypee Brothers Medical Publishers, Delhi",
+      "edition": "7th",
+      "year": "2021"
+    },
+    {
+      "title": "Gray's Anatomy",
+      "author": "Susan Standring",
+      "publisher": "Elsevier Churchill Livingstone, Edinburgh",
+      "edition": "42nd",
+      "year": "2021"
+    }
+  ],
+  "provenance": {
+    "pages": [4, 5, 6, 8, 9],
+    "notes": "Page numbers listed as seen in excerpt; some lines show page markers like 'Abe 8 Page' and 'Alve 9 Page'."
+  }
+}

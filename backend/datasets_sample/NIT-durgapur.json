@@ -1,0 +1,183 @@
+{
+  "course_meta": {
+    "programs": ["B.Tech.", "Dual Degree", "Integrated M.Sc."],
+    "academic_year": 2023,
+    "course_code": "XEC02",
+    "course_title": "Basic Electrical and Electronics Engineering",
+    "category": "Program Core (PCR)",
+    "contact_hours_per_week": {
+      "lecture": 3,
+      "tutorial": 0,
+      "practical": 0,
+      "total": 3
+    },
+    "credits": 3,
+    "prerequisites": "(10+2) level mathematics and physics",
+    "assessment_methods": ["CT", "MT", "EA"]
+  },
+  "course_outcomes": [
+    {
+      "code": "CO1",
+      "description": "Learn the fundamentals of electric circuits and analyze the circuits using laws and network theorems."
+    },
+    {
+      "code": "CO2",
+      "description": "Gain the knowledge about magnetic circuits, electromagnetism and the basics of generation of alternating voltage."
+    },
+    {
+      "code": "CO3",
+      "description": "Understand the behaviour of single phase and poly-phase AC circuits."
+    },
+    {
+      "code": "CO4",
+      "description": "Understand the fundamentals of semiconductor devices."
+    },
+    {
+      "code": "CO5",
+      "description": "Analyze the design and characteristics of transistor-based electronic circuits."
+    },
+    {
+      "code": "CO6",
+      "description": "Evaluate operational amplifier-based circuits and logic gates."
+    }
+  ],
+  "topics_covered": [
+    {
+      "index": 1,
+      "title": "Introduction to Electrical systems, Fundamentals of Electric Circuits",
+      "details": [
+        "Ohm’s laws",
+        "Kirchhoff’s laws",
+        "Independent and Dependent sources",
+        "Analysis of simple circuits"
+      ],
+      "hours": 4
+    },
+    {
+      "index": 2,
+      "title": "Network theorems (DC)",
+      "details": [
+        "Superposition Theorem",
+        "Thevenin’s Theorem",
+        "Norton’s Theorem",
+        "Maximum Power Transfer Theorem"
+      ],
+      "hours": 5
+    },
+    {
+      "index": 3,
+      "title": "Magnetic circuits",
+      "details": [
+        "Review of fundamental laws of electromagnetic induction",
+        "Self and mutual inductances",
+        "Solution of magnetic circuits"
+      ],
+      "hours": 3
+    },
+    {
+      "index": 4,
+      "title": "AC generation and single-phase AC circuits",
+      "details": [
+        "Generation of alternating voltage and current",
+        "E.M.F. equation",
+        "Average and R.M.S. value",
+        "Phase and phase difference",
+        "Phasor representation of alternating quantity",
+        "Behaviour of AC circuits",
+        "Resonance in series and parallel R-L-C circuits"
+      ],
+      "hours": 6
+    },
+    {
+      "index": 5,
+      "title": "Poly-phase systems",
+      "details": [
+        "Advantages of 3-phase system",
+        "Generation of 3-phase voltages",
+        "Voltage, current and power in star and delta connected systems",
+        "3-phase balanced and unbalanced circuits"
+      ],
+      "hours": 3
+    },
+    {
+      "index": 6,
+      "title": "Semiconductor Devices",
+      "details": [
+        "Construction, working and V-I characteristics of diode",
+        "Zener diode and Zener as a voltage regulator",
+        "LED"
+      ],
+      "hours": 6
+    },
+    {
+      "index": 7,
+      "title": "Transistors and biasing",
+      "details": [
+        "Introduction to BJT, FET, MOSFET; CMOS",
+        "Working principle and V-I characteristics of transistors",
+        "Biasing of BJT circuits: fixed bias, emitter bias, feedback bias, voltage divider bias",
+        "Transistor as an amplifier"
+      ],
+      "hours": 8
+    },
+    {
+      "index": 8,
+      "title": "Operational Amplifier",
+      "details": [
+        "Introduction",
+        "Applications: inverting, non-inverting amplifier, unity follower, integrator, differentiator, summing circuit"
+      ],
+      "hours": 4
+    },
+    {
+      "index": 9,
+      "title": "Logic gates and memory",
+      "details": [
+        "Introduction of logic gates",
+        "Memory: ROM, RAM"
+      ],
+      "hours": 3
+    }
+  ],
+  "textbooks": [
+    {
+      "title": "Electrical & Electronic Technology",
+      "authors": ["Hughes"],
+      "publisher": "Pearson Education India"
+    },
+    {
+      "title": "Introduction Electronic Devices & Circuit Theory (11/e, 2012)",
+      "authors": ["Boylestad", "Nashelsky"],
+      "publisher": "Pearson"
+    },
+    {
+      "title": "Electronics: Fundamentals and Applications",
+      "authors": ["D. Chattopadhyay", "P. C. Rakshit"],
+      "publisher": "New Age International"
+    }
+  ],
+  "references": [
+    {
+      "title": "Advanced Electrical Technology",
+      "author": "H. Cotton",
+      "publisher": "Reem Publication Pvt. Ltd."
+    },
+    {
+      "title": "Electrical Engineering Fundamentals",
+      "author": "Vincent Deltoro",
+      "publisher": "Pearson Education India"
+    },
+    {
+      "title": "The Art of Electronics (3e)",
+      "authors": ["Paul Horowitz", "Winfield Hill"]
+    },
+    {
+      "title": "Electronics - Circuits and Systems (4th Edition)",
+      "author": "Owen Bishop"
+    },
+    {
+      "title": "Electronics Fundamentals: Circuits, Devices & Applications (8e)",
+      "authors": ["Thomas L. Floyd", "David M. Buchla"]
+    }
+  ]
+}

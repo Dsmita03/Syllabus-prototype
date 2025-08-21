@@ -1,0 +1,82 @@
+{
+  "course_meta": {
+    "course_name": "Basic Electrical Engineering Lab",
+    "course_code": "ELEC1051",
+    "contact_hours_per_week": {
+      "L": 0,
+      "T": 0,
+      "P": 2,
+      "total": 2
+    },
+    "credit_points": 1
+  },
+  "course_outcomes": [
+    {
+      "code": "ELEC1051.1",
+      "description": "Get an exposure to common electrical apparatus and their ratings."
+    },
+    {
+      "code": "ELEC1051.2",
+      "description": "Make electrical connections by wires of appropriate ratings."
+    },
+    {
+      "code": "ELEC1051.3",
+      "description": "Understand the application of common electrical measuring instruments."
+    },
+    {
+      "code": "ELEC1051.4",
+      "description": "Understand the basic characteristics of different electrical machines."
+    }
+  ],
+  "detailed_syllabus": [
+    {
+      "index": 1,
+      "title": "Characteristics of Fluorescent lamps"
+    },
+    {
+      "index": 2,
+      "title": "Characteristics of Tungsten and Carbon filament lamps"
+    },
+    {
+      "index": 3,
+      "title": "Verification of Thevenin's and Norton's theorem"
+    },
+    {
+      "index": 4,
+      "title": "Verification of Superposition theorem"
+    },
+    {
+      "index": 5,
+      "title": "Verification of Maximum Power Transfer theorem"
+    },
+    {
+      "index": 6,
+      "title": "Calibration of ammeter and voltmeter"
+    },
+    {
+      "index": 7,
+      "title": "Open circuit and Short circuit test of a single-phase Transformer"
+    },
+    {
+      "index": 8,
+      "title": "Study of R-L-C Series / Parallel circuit"
+    },
+    {
+      "index": 9,
+      "title": "Starting and reversing of speed of a D.C. shunt Motor"
+    },
+    {
+      "index": 10,
+      "title": "Speed control of DC shunt motor"
+    },
+    {
+      "index": 11,
+      "title": "No load characteristics of D.C shunt Generators"
+    },
+    {
+      "index": 12,
+      "title": "Measurement of power in a three-phase circuit by two wattmeter method"
+    }
+  ]
+   
+}

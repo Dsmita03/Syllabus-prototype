@@ -1,0 +1,120 @@
+{
+  "course_meta": {
+    "program": "B.Tech. (IT)",
+    "curriculum_year": "2018-19",
+    "course_name": "Design and Analysis of Algorithm",
+    "course_code": "PC(CS/IT)406",
+    "semester": "4th",
+    "duration_months": 6,
+    "maximum_marks": 100,
+    "teaching_scheme": {
+      "theory_hours_per_week": 3,
+      "tutorial": "NIL",
+      "practical": "NIL",
+      "credit_points": 3
+    },
+    "examination_scheme": {
+      "mid_term_exam_I": 15,
+      "mid_term_exam_II": 15,
+      "assignment": 20,
+      "semester_end_exam": {
+        "marks": 75,
+        "weightage_for_final_reckoning_marks": 50,
+        "note": "Two third weightage for final reckoning i.e., 50 marks"
+      }
+    }
+  },
+  "objectives": [
+    "To understand different paradigms of algorithms such as greedy, dynamic programming, divide and conquer etc.",
+    "To calculate the time complexities of algorithms.",
+    "The ability to decide based on a given problem which design paradigm and algorithm is appropriate."
+  ],
+  "pre_requisites": [
+    "Data Structure and Algorithm (PC(CS/IT)302)"
+  ],
+  "modules": [
+    {
+      "index": 1,
+      "title": "Models of computation & Algorithm design frameworks",
+      "topics": [
+        "Models of computation - RAM model",
+        "Deterministic and Non-deterministic problems",
+        "Tractable and Intractable problems",
+        "Solvability",
+        "Algorithm design frameworks - Divide/Decrease and Conquer, Backtracking, Greedy, Dynamic Programming",
+        "Decision and Optimization problems",
+        "Comparison - Divide & Conquer, Greedy and Dynamic Programming"
+      ],
+      "lecture_hours": 5
+    },
+    {
+      "index": 2,
+      "title": "Sorting",
+      "topics": [
+        "Comparison based sorts - Bubble sort, insertion sort, selection sort, quick sort, merge sort; analysis and comparison",
+        "Non-comparison based sorts - Radix sort, count sort",
+        "Median order statistics",
+        "Lower bound of sorting"
+      ],
+      "lecture_hours": 8
+    },
+    {
+      "index": 3,
+      "title": "Illustrations of various design framework",
+      "topics": [
+        "Dynamic Programming - Optimal substructure and overlapping subproblems; Matrix-chain multiplication",
+        "Backtracking - 8-queens problem",
+        "Greedy Method - Knapsack problem, Job sequencing with deadlines"
+      ],
+      "lecture_hours": 7
+    },
+    {
+      "index": 4,
+      "title": "Graph Algorithms",
+      "topics": [
+        "BFS and DFS - algorithm and comparison",
+        "Single source shortest path",
+        "All pairs shortest paths",
+        "Prim's and Kruskal's algorithms for finding minimum spanning tree"
+      ],
+      "lecture_hours": 6
+    },
+    {
+      "index": 5,
+      "title": "String matching problem",
+      "topics": [
+        "Naive algorithm",
+        "Knuth-Morris-Pratt (KMP) algorithm"
+      ],
+      "lecture_hours": 3
+    },
+    {
+      "index": 6,
+      "title": "Amortized Analysis",
+      "topics": [
+        "Basic concept of amortized analysis",
+        "Disjoint set data structure"
+      ],
+      "lecture_hours": 4
+    },
+    {
+      "index": 7,
+      "title": "P and NP",
+      "topics": [
+        "Notion of NP Class: P, NP, NP-hard, NP-complete",
+        "Reduction (concept only)",
+        "Cook’s theorem (statement only)"
+      ],
+      "lecture_hours": 3
+    }
+  ],
+  "textbooks_and_references": [
+    {
+      "title": "Modern Electronic Communication, Principles and Practice",
+      "authors": ["Sharma", "Sinha"],
+      "publisher": "Dhanpat Rai Publishing Company (P) Ltd",
+      "note": "Appears unrelated to the algorithm course; listed in provided excerpt header."
+    }
+  ],
+  "notes": "Structured directly from the provided Design.pdf excerpt. No explicit lab/tutorial components; theory-only course with 3 credits."
+}

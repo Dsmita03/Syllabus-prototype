@@ -1,0 +1,105 @@
+{
+  "course_meta": {
+    "course_code": "BS104",
+    "course_title": "Applied Physics -II",
+    "credits": "3(L:3,DCS: 1, P:0)",
+    "prerequisites": "High School Level Physics",
+    "course_category": "BS",
+    "institution": "Udaipur"
+  },
+  "course_objectives": "Applied Physics aims to give an understanding of this world both by observation and by prediction of the way in which objects behave. Concrete use of physical principles and analysis in various fields of engineering and technology are given prominence in the course content. The course will help the diploma engineers to apply the basic concepts and principles to solve broad-based engineering problems and to understand different technology based applications.",
+  "modules": [
+    {
+      "index": 1,
+      "title": "Wave motion and its applications",
+      "topics": [
+        "Wave motion: transverse and longitudinal waves with examples",
+        "Definitions: wave velocity, frequency, wavelength and their relationship",
+        "Sound and light waves and their properties",
+        "Wave equation: y = r sin ωt; amplitude, phase, phase difference",
+        "Principle of superposition and beats",
+        "Simple Harmonic Motion (SHM): displacement, velocity, acceleration, time period, frequency",
+        "Free, forced and resonant vibrations with examples",
+        "Acoustics of buildings: reverberation, reverberation time, echo, noise, coefficient of absorption, control methods and applications",
+        "Ultrasonic waves: introduction, properties, engineering and medical applications"
+      ],
+      "provenance": {
+        "pages": [41]
+      }
+    },
+    {
+      "index": 2,
+      "title": "Optics",
+      "topics": [
+        "Basic optical laws: reflection and refraction; refractive index",
+        "Image formation by mirrors and lenses; thin lenses; lens formula, power, magnification",
+        "Total internal reflection: critical angle, conditions, applications in optical fiber",
+        "Optical instruments: simple and compound microscope, astronomical telescope in normal adjustment; magnifying power"
+      ],
+      "provenance": {
+        "pages": [41, 42]
+      }
+    },
+    {
+      "index": 3,
+      "title": "Electrostatics",
+      "topics": [
+        "Coulomb’s law; unit of charge",
+        "Electric field; electric lines of force and properties",
+        "Electric flux; electric potential and potential difference; Gauss’s law",
+        "Capacitors: working, capacitance and units; parallel plate capacitance",
+        "Series and parallel combination of capacitors (numericals)",
+        "Dielectrics and effect on capacitance; dielectric breakdown"
+      ],
+      "provenance": {
+        "pages": [42]
+      }
+    },
+    {
+      "index": 4,
+      "title": "Current Electricity",
+      "topics": [
+        "Electric current and units; DC and AC",
+        "Resistance and units; specific resistance, conductance, specific conductance",
+        "Series and parallel combinations of resistances",
+        "Factors affecting resistance of a wire; carbon resistors and color coding",
+        "Ohm’s law and verification; Kirchhoff’s laws",
+        "Terminal potential difference and EMF",
+        "Heating effect of current; electric power and energy with units (numericals)",
+        "Advantages of electric energy over other forms"
+      ],
+      "provenance": {
+        "pages": [42]
+      }
+    },
+    {
+      "index": 5,
+      "title": "Electromagnetism",
+      "topics": [
+        "Magnetic materials: diamagnetic, paramagnetic, ferromagnetic properties",
+        "Magnetic field and units; magnetic intensity; lines of force; magnetic flux and units; magnetization",
+        "Lorentz force on moving charge; force on current-carrying conductor",
+        "Moving coil galvanometer: principle, construction, working",
+        "Conversion of galvanometer into ammeter and voltmeter"
+      ],
+      "provenance": {
+        "pages": [42]
+      }
+    },
+    {
+      "index": 6,
+      "title": "Semiconductor Physics",
+      "topics": [
+        "Energy bands in solids",
+        "Types of materials: insulator, semiconductor, conductor",
+        "Intrinsic and extrinsic semiconductors",
+        "p-n junction and diode; V-I characteristics",
+        "Diode as rectifier: half-wave and full-wave (center-tapped)",
+        "Photocells and solar cells: working principles and engineering applications"
+      ],
+      "provenance": {
+        "pages": [42]
+      }
+    }
+  ]
+}
