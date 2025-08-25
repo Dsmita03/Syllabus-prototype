@@ -1,37 +1,38 @@
-import { BookOpen } from 'lucide-react';
-
 export default function Navbar() {
   return (
-    <header className="relative z-10 bg-white/80 backdrop-blur-lg border-b border-white/20">
-      <div className="container mx-auto px-4 py-4">
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+      <div className="container mx-auto px-6 py-4">
         <nav className="flex items-center justify-between">
+          {/* Logo Section */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
-              <BookOpen className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-[#BBDCE5] rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-xl font-bold text-gray-800">E</span>
             </div>
-            <div>
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                EduModule
-              </span>
-              <div className="text-xs text-purple-600 font-medium">AI-Powered Learning</div>
-            </div>
+            <span className="text-lg font-semibold text-gray-800 tracking-wide">
+              EduModule
+            </span>
           </div>
+
+          {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
             <a 
+              href="#home" 
+              className="text-gray-700 hover:text-[#BBDCE5] transition-colors font-medium"
+            >
+              Home
+            </a>
+            <a 
               href="#features" 
-              className="text-gray-700 hover:text-purple-600 transition-colors font-medium"
+              className="text-gray-700 hover:text-[#BBDCE5] transition-colors font-medium"
             >
               Features
             </a>
             <a 
               href="#how-it-works" 
-              className="text-gray-700 hover:text-purple-600 transition-colors font-medium"
+              className="text-gray-700 hover:text-[#BBDCE5] transition-colors font-medium"
             >
               How it Works
             </a>
-            <button className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 transform hover:scale-105 shadow-lg">
-              Get Started
-            </button>
           </div>
         </nav>
       </div>

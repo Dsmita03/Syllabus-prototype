@@ -2,46 +2,42 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {  CheckCircle, ArrowLeft, FileText, Sparkles, Zap, Brain, Target, Clock } from 'lucide-react';
+import { CheckCircle, ArrowLeft, FileText, Brain, Target, Zap } from 'lucide-react';
 
 export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState('Initializing...');
   const [error, setError] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
-   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileId = searchParams.get('fileId');
 
   const processingSteps = [
     { 
-      progress: 20, 
-      status: 'Extracting text from document...', 
+      progress: 25, 
+      status: 'Reading document...', 
       delay: 1000, 
       icon: FileText,
-      description: 'Reading and parsing your syllabus content'
     },
     { 
-      progress: 40, 
-      status: 'Analyzing content structure...', 
+      progress: 50, 
+      status: 'Analyzing content...', 
       delay: 1500, 
       icon: Brain,
-      description: 'Understanding topics and learning objectives'
     },
     { 
-      progress: 60, 
-      status: 'Creating learning modules...', 
+      progress: 75, 
+      status: 'Creating modules...', 
       delay: 1000, 
       icon: Target,
-      description: 'Organizing content into structured modules'
     },
     { 
-      progress: 80, 
-      status: 'Generating AI questions...', 
+      progress: 100, 
+      status: 'Generating questions...', 
       delay: 2000, 
       icon: Zap,
-      description: 'Creating personalized assessment questions'
     },
   ];
 
@@ -73,7 +69,6 @@ export default function ProcessingPage() {
         const result = await response.json();
         
         if (result.success) {
-          setProgress(100);
           setStatus('Complete! Redirecting...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           router.push(`/results?sessionId=${result.session_id}`);
@@ -92,212 +87,145 @@ export default function ProcessingPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 flex items-center justify-center p-4">
-        <div className="max-w-lg w-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 text-center border border-red-100">
-          {/* Error Animation */}
-          <div className="relative mb-8">
-            <div className="w-24 h-24 bg-gradient-to-br from-red-400 to-orange-500 rounded-full flex items-center justify-center mx-auto animate-pulse shadow-lg">
-              <span className="text-6xl mb-6">⚠️</span>
-            </div>
-            
+      <div className="min-h-screen bg-gradient-to-br from-[#ECEEDF] via-white to-[#BBDCE5]/30 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center border border-[#D9C4B0]/30">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6 mx-auto">
+            <span className="text-2xl">⚠️</span>
           </div>
-          
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Oops! Something went wrong</h2>
-          <p className="text-gray-600 mb-8 leading-relaxed text-lg">{error}</p>
-          
-          <div className="space-y-4">
-            <button
-              onClick={() => router.push('/')}
-              className="w-full inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-2xl hover:from-red-600 hover:to-orange-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Try Again
-            </button>
-            
-          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center justify-center w-full px-6 py-3 bg-[#BBDCE5] text-white font-semibold rounded-lg hover:bg-[#a5cfd8] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Try Again
+          </button>
         </div>
       </div>
     );
   }
 
   const currentStepData = processingSteps[currentStep] || processingSteps[processingSteps.length - 1];
-  const StepIcon = currentStepData?.icon || Sparkles;
+  const StepIcon = currentStepData?.icon || FileText;
+  const isComplete = progress === 100;
 
   return (
-  
-  <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 relative overflow-hidden">
-      {/* Enhanced Background Elements */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-gradient-to-r from-purple-400/20 to-indigo-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-r from-indigo-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-pink-300/10 to-blue-300/10 rounded-full blur-3xl animate-pulse delay-500"></div>
-      </div>
-
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
-        <div className="max-w-2xl w-full">
-          <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-purple-100 overflow-hidden">
-            
-            {/* Header Section */}
-            <div className="bg-gradient-to-r from-purple-500 to-indigo-600 p-8 text-white text-center">
-              <h1 className="text-3xl font-bold mb-2">AI Processing Center</h1>
-              <p className="text-purple-100">Transform your syllabus into smart learning modules</p>
+    <div className="min-h-screen bg-gradient-to-br from-[#ECEEDF] via-white to-[#BBDCE5]/30 flex items-center justify-center p-6">
+      <div className="max-w-lg w-full">
+        <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 p-8">
+          
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-[#BBDCE5] rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Brain className="w-8 h-8 text-white" />
             </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Processing Your Syllabus</h1>
+            <p className="text-gray-600">Creating smart learning modules</p>
+          </div>
 
-            {/* Main Content */}
-            <div className="p-8">
-              
-              {/* Central Progress Circle */}
-              <div className="text-center mb-8">
-                <div className="relative inline-block">
-                  {progress === 100 ? (
-                    <div className="w-32 h-32 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center animate-bounce shadow-2xl">
-                      <CheckCircle className="w-16 h-16 text-white" />
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      {/* Outer Ring */}
-                      <div className="w-32 h-32 rounded-full border-8 border-purple-100"></div>
-                      
-                      {/* Progress Ring */}
-                      <svg className="absolute inset-0 w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r="50"
-                          stroke="currentColor"
-                          strokeWidth="8"
-                          fill="none"
-                          className="text-purple-200"
-                        />
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r="50"
-                          stroke="url(#gradient)"
-                          strokeWidth="8"
-                          fill="none"
-                          strokeLinecap="round"
-                          strokeDasharray={`${2 * Math.PI * 50}`}
-                          strokeDashoffset={`${2 * Math.PI * 50 * (1 - progress / 100)}`}
-                          className="transition-all duration-1000 ease-out"
-                        />
-                        <defs>
-                          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#8B5CF6" />
-                            <stop offset="100%" stopColor="#3B82F6" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                      
-                      {/* Inner Icon */}
-                      <div className="absolute inset-4 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                        <currentStepData.icon className="w-12 h-12 text-white animate-pulse" />
-                      </div>
-                      
-                      {/* Progress Percentage */}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-white mt-16">{progress}%</span>
-                      </div>
-                    </div>
-                  )}
+          {/* Progress Circle */}
+          <div className="text-center mb-8">
+            <div className="relative inline-block">
+              {isComplete ? (
+                <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center animate-bounce">
+                  <CheckCircle className="w-12 h-12 text-white" />
                 </div>
-              </div>
-
-              {/* Status Text */}
-              <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  {progress === 100 ? '🎉 Processing Complete!' : 'AI is Working...'}
-                </h2>
-                <p className="text-lg text-purple-600 font-medium mb-2">{status}</p>
-                {currentStepData?.description && progress < 100 && (
-                  <p className="text-gray-600">{currentStepData.description}</p>
-                )}
-              </div>
-
-              {/* Steps Progress */}
-              <div className="space-y-4 mb-8">
-                {processingSteps.map((step, index) => {
-                  const StepIcon = step.icon;
-                  const isCompleted = completedSteps.includes(index);
-                  const isCurrent = currentStep === index;
-                  const isUpcoming = index > currentStep;
-
-                  return (
-                    <div 
-                      key={index}
-                      className={`flex items-center p-4 rounded-2xl transition-all duration-500 ${
-                        isCompleted 
-                          ? 'bg-green-50 border-2 border-green-200' 
-                          : isCurrent 
-                            ? 'bg-purple-50 border-2 border-purple-200 animate-pulse' 
-                            : 'bg-gray-50 border-2 border-gray-100'
-                      }`}
-                    >
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 transition-all duration-300 ${
-                        isCompleted 
-                          ? 'bg-green-500 text-white' 
-                          : isCurrent 
-                            ? 'bg-purple-500 text-white animate-pulse' 
-                            : 'bg-gray-300 text-gray-500'
-                      }`}>
-                        {isCompleted ? (
-                          <CheckCircle className="w-6 h-6" />
-                        ) : (
-                          <StepIcon className="w-6 h-6" />
-                        )}
-                      </div>
-                      
-                      <div className="flex-1">
-                        <h3 className={`font-semibold ${
-                          isCompleted ? 'text-green-800' : isCurrent ? 'text-purple-800' : 'text-gray-600'
-                        }`}>
-                          {step.status}
-                        </h3>
-                        <p className={`text-sm ${
-                          isCompleted ? 'text-green-600' : isCurrent ? 'text-purple-600' : 'text-gray-500'
-                        }`}>
-                          {step.description}
-                        </p>
-                      </div>
-                      
-                      {isCompleted && (
-                        <div className="text-green-500 animate-fade-in">
-                          <CheckCircle className="w-6 h-6" />
-                        </div>
-                      )}
-                      
-                      {isCurrent && (
-                        <div className="flex items-center text-purple-500">
-                          <Clock className="w-5 h-5 animate-spin" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Fun Facts or Tips */}
-              {progress < 100 && (
-                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-6 border border-purple-100">
-                  <div className="flex items-center mb-3">
-                    <Sparkles className="w-5 h-5 text-purple-500 mr-2" />
-                    <h4 className="font-semibold text-purple-800">Did you know?</h4>
+              ) : (
+                <div className="relative w-24 h-24">
+                  <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      stroke="#ECEEDF"
+                      strokeWidth="8"
+                      fill="none"
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      stroke="#BBDCE5"
+                      strokeWidth="8"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 40}`}
+                      strokeDashoffset={`${2 * Math.PI * 40 * (1 - progress / 100)}`}
+                      className="transition-all duration-1000 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <StepIcon className="w-8 h-8 text-[#BBDCE5]" />
                   </div>
-                  <p className="text-purple-700 text-sm">
-                    Our AI can process documents in multiple formats and automatically detects learning objectives, 
-                    key topics, and creates personalized assessment questions based on your syllabus content.
-                  </p>
                 </div>
               )}
-
+            </div>
+            <div className="mt-4">
+              <p className="text-lg font-semibold text-gray-900">{progress}%</p>
+              <p className="text-[#BBDCE5] font-medium">{status}</p>
             </div>
           </div>
+
+          {/* Steps List */}
+          <div className="space-y-3">
+            {processingSteps.map((step, index) => {
+              const StepIcon = step.icon;
+              const isCompleted = completedSteps.includes(index);
+              const isCurrent = currentStep === index;
+              
+              return (
+                <div 
+                  key={index}
+                  className={`flex items-center p-3 rounded-lg transition-all duration-300 ${
+                    isCompleted 
+                      ? 'bg-green-50 text-green-700' 
+                      : isCurrent 
+                        ? 'bg-[#BBDCE5]/10 text-[#BBDCE5]' 
+                        : 'bg-[#ECEEDF]/50 text-gray-500'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
+                    isCompleted 
+                      ? 'bg-green-500 text-white' 
+                      : isCurrent 
+                        ? 'bg-[#BBDCE5] text-white' 
+                        : 'bg-[#D9C4B0]/50 text-gray-600'
+                  }`}>
+                    {isCompleted ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : (
+                      <StepIcon className="w-4 h-4" />
+                    )}
+                  </div>
+                  <span className="font-medium">{step.status}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tip */}
+          <div className="mt-8 p-4 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20 rounded-lg border border-[#D9C4B0]/30">
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold text-[#BBDCE5]">💡 Tip:</span> Our AI analyzes your content structure and creates personalized questions for better learning outcomes.
+            </p>
+          </div>
+
+          {/* Complete Button */}
+          {isComplete && (
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => router.push('/')}
+                className="inline-flex items-center px-6 py-3 bg-[#BBDCE5] text-white font-semibold rounded-lg hover:bg-[#a5cfd8] transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </button>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
   );
 }
-
-
-
-
