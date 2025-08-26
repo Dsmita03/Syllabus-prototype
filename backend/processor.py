@@ -46,13 +46,13 @@ OCR_DPI = 300
 
 
 class SyllabusProcessor:
-    def __init__(self):
+      def __init__(self):
         """
         Initializes the processor, loading the Groq API key from environment variables.
         """
         # For Google Colab, it's better to use the userdata library
         try:
-            self.api_key =os.getenv("GROQ_API_KEY")
+            self.api_key = os.getenv("GROQ_API_KEY")
             print("Loaded GROQ_API_KEY from Colab Secrets.")
         except (ImportError, KeyError):
             self.api_key = os.getenv("GROQ_API_KEY")
@@ -63,31 +63,47 @@ class SyllabusProcessor:
 
         print("SyllabusProcessor initialized with Groq API.")
 
-    # ==============================================================================
+ 
     # PART I: ROBUST PDF & TEXT EXTRACTION
-    # ==============================================================================
+   
+      def _extract_text_with_table_detection(self, doc: fitz.Document) -> (str, bool):
+          """
+          Specialized method for PDFs with clear table structures.
+          """
+          full_text = ""
+          table_char_count = 0
+          for page in doc:
+              # FIX: Convert the finder object to a list of tables first.
+             table_list = page.find_tables().tables
+        
+             if table_list:
+                # Now, you can safely use len() on the list.
+                print(f"Found {len(table_list)} table(s) on page {page.number + 1}.")
+                for table in table_list:
+                    extracted_table = table.extract()
+                    if extracted_table:
+                       for row in extracted_table:
+                           row_text = " | ".join(str(cell).replace('\n', ' ') if cell is not None else "" for cell in row)
+                           full_text += row_text + "\n"
+                           table_char_count += len(row_text)
+                        
+           # Consider it successful only if a significant amount of text was found in tables
+          is_successful = table_char_count > 500
+          return full_text, is_successful
 
-    def _extract_text_from_digital_pdf(self, pdf_path: str) -> (str, bool):
+      def _extract_text_with_block_detection(self, doc: fitz.Document) -> (str, bool):
         """
-        Extracts text from a digital PDF file, preserving block structure.
+        General purpose method for unstructured or semi-structured PDFs.
         """
-        try:
-            doc = fitz.open(pdf_path)
-            full_text = ""
-            for page in doc:
-                blocks = page.get_text("blocks")
-                blocks.sort(key=lambda b: (b[1], b[0]))
-                for b in blocks:
-                    full_text += b[4] + "\n"
+        full_text = ""
+        for page in doc:
+            blocks = page.get_text("blocks", sort=True)
+            for b in blocks:
+                full_text += b[4]
+        is_successful = len(full_text.strip()) > 200
+        return full_text, is_successful
 
-            is_successful = len(full_text.strip()) > 200
-            print(f"Digital extraction yielded {len(full_text.strip())} characters.")
-            return full_text, is_successful
-        except Exception as e:
-            print(f"Error processing {pdf_path} with PyMuPDF: {e}")
-            return "", False
-
-    def _ocr_scanned_pdf(self, pdf_path: str) -> (str, bool):
+      def _ocr_scanned_pdf(self, pdf_path: str) -> (str, bool):
         """
         Performs OCR on a scanned PDF using Tesseract after pre-processing images.
         """
@@ -111,18 +127,37 @@ class SyllabusProcessor:
             print(f"Error processing {pdf_path} with OCR: {e}")
             return "", False
 
-    def _get_text_from_pdf(self, pdf_path: str) -> str:
+      # FILE: processor.py
+
+      def _get_text_from_pdf(self, pdf_path: str) -> str:
         """
-        Hybrid pipeline to extract text from a PDF. It tries digital extraction
-        first and falls back to OCR if the initial attempt fails.
+        Hybrid pipeline controller. Tries block, then table, then OCR extraction.
         """
-        print("Step 1: Attempting digital text extraction...")
-        text, success = self._extract_text_from_digital_pdf(pdf_path)
+        try:
+            doc = fitz.open(pdf_path)
+        except Exception as e:
+            raise Exception(f"Error opening {pdf_path} with PyMuPDF: {e}")
+
+        # CHANGED: Attempt general block extraction FIRST. It is more reliable.
+        print("Step 1: Attempting general block extraction...")
+        text, success = self._extract_text_with_block_detection(doc)
         if success:
-            print("Successfully extracted digital text. Skipping OCR.")
+            print("General block extraction successful.")
+            doc.close()
             return text
 
-        print("\nDigital extraction failed or yielded poor results. Falling back to OCR...")
+        # CHANGED: Fallback to specialized table extraction only if block fails.
+        print("Block extraction not suitable. Falling back to table extraction...")
+        text, success = self._extract_text_with_table_detection(doc)
+        if success:
+            print("Table extraction successful. Using this method.")
+            doc.close()
+            return text
+        
+        doc.close()
+
+        # Final fallback to OCR remains the same.
+        print("Digital extraction yielded poor results. Falling back to OCR...")
         text, success = self._ocr_scanned_pdf(pdf_path)
         if success:
             print("Successfully extracted text using OCR.")
@@ -130,7 +165,7 @@ class SyllabusProcessor:
         else:
             raise Exception(f"Critical Error: Could not extract text from {pdf_path} using any method.")
 
-    def _extract_text_from_txt(self, file_path: str) -> str:
+      def _extract_text_from_txt(self, file_path: str) -> str:
         """Extracts text from a plain text file."""
         try:
             with open(file_path, "r", encoding="utf-8") as f:
@@ -138,11 +173,10 @@ class SyllabusProcessor:
         except Exception as e:
             raise Exception(f"Error reading text file: {e}")
 
-    # ==============================================================================
+     
     # PART II: AI-POWERED MODULE EXTRACTION (ADVANCED PROMPT)
-    # ==============================================================================
-
-    def _extract_modules_with_llm(self, syllabus_text: str) -> List[Dict[str, Any]]:
+    
+      def _extract_modules_with_llm(self, syllabus_text: str) -> List[Dict[str, Any]]:
         """
         Sends the syllabus text to the Groq API to extract modules.
         The prompt has been significantly enhanced with new examples to handle diverse formats.
@@ -150,25 +184,32 @@ class SyllabusProcessor:
         print("\nStep 2: Sending text to Groq API for module extraction...")
 
         system_prompt = """
-You are an expert academic data extraction system. Your task is to extract all modules, units, or weekly topics from a given university syllabus text into a structured JSON format.
+You are an expert academic data extraction system. 
+Your task is to extract structured academic content (modules, units, topics) 
+from diverse syllabus texts into a JSON format.
 
 **Instructions:**
-1. Identify each distinct module, unit, or topic. These can be in lists, tables, paragraphs, or numbered outlines.
-2. For each module, extract the module number (if available), title, and a description. If the title is descriptive enough, the description can be the same as the title.
-3. Adhere strictly to the JSON schema provided. Do not add extra keys.
-4. If a piece of information is not available, use a `null` value.
-5. If no modules are found, return a JSON object with an empty "modules" array.
-6. Your entire output must be a single, valid JSON object and nothing else.
+1.  **Exhaustive Processing**: You MUST process the ENTIRE syllabus text from beginning to end and identify ALL distinct modules, topics, or units. Do not stop after finding the first one.
+2.  **Segmentation and Logic**:
+    * For each module, create a concise `module_title`. The text that follows the heading is the `description`. **Crucially, do not include the description text inside the title.**
+    * If a large text block contains an internal numbered or bulleted list (like in Example 13), you MUST split each item in that list into its own separate module.
+3.  **Schema and Fields**:
+    * Use the appropriate schema ('Module/Unit' style or 'Topic/Sub-topics' style).
+    * Return ONLY the fields genuinely present in the text. Use `null` for unavailable fields.
+4.  **Output Format**: Your entire output must be a single, valid JSON object.
+5.  **Ignore Metadata**: Ignore course objectives, outcomes, and other metadata. Only extract the distinct academic topic modules.
 
-**JSON Schema:**
+**Schemas:**
+Case A – Module/Unit style:
 {
   "modules": [
-    {
-      "module_number": "string or null",
-      "module_title": "string",
-      "description": "string",
-      "learning_outcome": "string or null"
-    }
+    {"module_number": "string or null","module_title": "string","description": "string","learning_outcome": "string or null"}
+  ]
+}
+Case B – Topic/Sub-topics style (Use for table formats with these specific column headers):
+{
+  "modules": [
+    { "Topic": "string", "Sub-topics": "string" }
   ]
 }
 
@@ -184,19 +225,10 @@ Walk, Trail, Path, Cycle, Euler Trails and Circuits, Planar Graphs.
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": null,
-      "module_title": "Introduction to Graph Theory",
-      "description": "Definitions and Examples, Subgraphs, Complement of a graph, Graph Isomorphism."
-    },
-    {
-      "module_number": null,
-      "module_title": "Path, Cycles, Coloring",
-      "description": "Walk, Trail, Path, Cycle, Euler Trails and Circuits, Planar Graphs."
-    }
+    {"module_number": null,"module_title": "Introduction to Graph Theory","description": "Definitions and Examples, Subgraphs, Complement of a graph, Graph Isomorphism." },
+    {"module_number": null,"module_title": "Path, Cycles, Coloring","description": "Walk, Trail, Path, Cycle, Euler Trails and Circuits, Planar Graphs."}
   ]
 }
-
 ---
 **Example 2 (Table Format):**
 Text: '''
@@ -208,19 +240,10 @@ Sl.No.  Contents
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": "1",
-      "module_title": "CPU structure and functions",
-      "description": "CPU structure and functions, processor organization, ALU, data paths."
-    },
-    {
-      "module_number": "2",
-      "module_title": "Processor control",
-      "description": "Processor control, micro-operations, instruction fetch, hardwired control."
-    }
+    {"module_number": "1","module_title": "CPU structure and functions","description": "CPU structure and functions, processor organization, ALU, data paths."},
+    {"module_number": "2","module_title": "Processor control","description": "Processor control, micro-operations, instruction fetch, hardwired control."}
   ]
 }
-
 ---
 **Example 3 (Numbered List Syllabus):**
 Text: '''
@@ -232,24 +255,11 @@ Syllabus:
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": "1",
-      "module_title": "Information, Data, Data Types, ADT",
-      "description": "Information, Data, Data Types, Abstract Data Type (ADT), Data Structure."
-    },
-    {
-      "module_number": "2",
-      "module_title": "Array as an ADT",
-      "description": "Array as an ADT, Single and Multidimensional Arrays, Structures, Sparse Matrix."
-    },
-    {
-      "module_number": "3",
-      "module_title": "Pointers and Linked Lists",
-      "description": "Pointers, ADT Linked List, Singly Linked List, Doubly Linked List."
-    }
+    {"module_number": "1","module_title": "Information, Data, Data Types, ADT","description": "Information, Data, Data Types, Abstract Data Type (ADT), Data Structure."},
+    {"module_number": "2","module_title": "Array as an ADT","description": "Array as an ADT, Single and Multidimensional Arrays, Structures, Sparse Matrix."},
+    {"module_number": "3","module_title": "Pointers and Linked Lists","description": "Pointers, ADT Linked List, Singly Linked List, Doubly Linked List."}
   ]
 }
-
 ---
 **Example 4 (Unit/Numbered List):**
 Text: '''
@@ -262,24 +272,11 @@ UNIT-II
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": "I.1",
-      "module_title": "UNIT-I: Introduction to anatomy",
-      "description": "Introduction to anatomy, anatomical terms, planes, organization of human body."
-    },
-    {
-      "module_number": "I.2",
-      "module_title": "UNIT-I: Musculo-skeletal system",
-      "description": "Musculo-skeletal system: Types of bones, structure & divisions of the skeleton system."
-    },
-    {
-      "module_number": "II.1",
-      "module_title": "UNIT-II: Anatomy of Circulatory system",
-      "description": "Anatomy of Circulatory system: General plan of circulatory system and its components."
-    }
+    {"module_number": "I.1","module_title": "UNIT-I: Introduction to anatomy","description": "Introduction to anatomy, anatomical terms, planes, organization of human body."},
+    {"module_number": "I.2","module_title": "UNIT-I: Musculo-skeletal system","description": "Musculo-skeletal system: Types of bones, structure & divisions of the skeleton system."},
+    {"module_number": "II.1","module_title": "UNIT-II: Anatomy of Circulatory system","description": "Anatomy of Circulatory system: General plan of circulatory system and its components."}
   ]
 }
-
 ---
 **Example 5 (Module with Hours Format):**
 Text: '''
@@ -291,19 +288,10 @@ Formation of partial differential equations - Singular integrals.
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": "1",
-      "module_title": "Ordinary Differential Equations (ODE)",
-      "description": "Second order non- homogenous differential equations with constant coefficients."
-    },
-    {
-      "module_number": "2",
-      "module_title": "Partial Differential Equations (PDE)",
-      "description": "Formation of partial differential equations - Singular integrals."
-    }
+    {"module_number": "1","module_title": "Ordinary Differential Equations (ODE)","description": "Second order non- homogenous differential equations with constant coefficients."},
+    {"module_number": "2","module_title": "Partial Differential Equations (PDE)","description": "Formation of partial differential equations - Singular integrals."}
   ]
 }
-
 ---
 **Example 6 (Simple Topic List):**
 Text: '''
@@ -315,24 +303,11 @@ Bash Scripting
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": null,
-      "module_title": "Regular Expression Tools (e.g Awk)",
-      "description": "Regular Expression Tools (e.g Awk)"
-    },
-    {
-      "module_number": null,
-      "module_title": "Lex and Yacc",
-      "description": "Lex and Yacc"
-    },
-    {
-      "module_number": null,
-      "module_title": "Bash Scripting",
-      "description": "Bash Scripting"
-    }
+    {"module_number": null,"module_title": "Regular Expression Tools (e.g Awk)","description": "Regular Expression Tools (e.g Awk)"},
+    {"module_number": null,"module_title": "Lex and Yacc","description": "Lex and Yacc"},
+    {"module_number": null,"module_title": "Bash Scripting","description": "Bash Scripting"}
   ]
 }
-
 ---
 **Example 7 (Long Unstructured Topic List):**
 Text: '''
@@ -345,29 +320,12 @@ Electrochemistry: Conductance of electrolytic solutions, specific conductance.
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": null,
-      "module_title": "Thermodynamics",
-      "description": "C, and C,: definition and relation; adiabatic changes; reversible and irreversible processes."
-    },
-    {
-      "module_number": null,
-      "module_title": "Second law thermodynamics",
-      "description": "Joule Thomson and throttling processes; inversion temperature."
-    },
-    {
-      "module_number": null,
-      "module_title": "Industrial Chemistry",
-      "description": "Solid, liquid and gaseous fuels; constituents of coal, carbonization of coal."
-    },
-    {
-        "module_number": null,
-        "module_title": "Electrochemistry",
-        "description": "Conductance of electrolytic solutions, specific conductance."
-    }
+    {"module_number": null,"module_title": "Thermodynamics","description": "C, and C,: definition and relation; adiabatic changes; reversible and irreversible processes."},
+    {"module_number": null,"module_title": "Second law thermodynamics","description": "Joule Thomson and throttling processes; inversion temperature."},
+    {"module_number": null,"module_title": "Industrial Chemistry","description": "Solid, liquid and gaseous fuels; constituents of coal, carbonization of coal."},
+    {"module_number": null,"module_title": "Electrochemistry","description": "Conductance of electrolytic solutions, specific conductance."}
   ]
 }
-
 ---
 **Example 8 (Highly Structured Table Format - NEW & MOST RELEVANT):**
 Text: '''
@@ -378,21 +336,10 @@ Text: '''
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": "1",
-      "topics_covered": "Introduction: Need of compilers; Cousins of compilers; Compiler writing tools, compiler phases.",
-      "lecture_hours": 2,
-      "learning_outcome": "The students will be introduced with the language translator, their need and various phases of a compiler."
-    },
-    {
-      "module_number": "2",
-      "topics_covered": "Lexical analysis: Tokens, regular expressions, transition diagrams, Design of lexical analyzer generator.",
-      "lecture_hours": 5,
-      "learning_outcome": "Students will be familiar with various elements of a scanner (lexical analyzer). They will also learn how to use transition diagram or finite automata for designing a new lexical analyzer"
-    }
+    {"module_number": "1","topics_covered": "Introduction: Need of compilers; Cousins of compilers; Compiler writing tools, compiler phases.","lecture_hours": 2,"learning_outcome": "The students will be introduced with the language translator, their need and various phases of a compiler."},
+    {"module_number": "2","topics_covered": "Lexical analysis: Tokens, regular expressions, transition diagrams, Design of lexical analyzer generator.","lecture_hours": 5,"learning_outcome": "Students will be familiar with various elements of a scanner (lexical analyzer). They will also learn how to use transition diagram or finite automata for designing a new lexical analyzer"}
   ]
 }
-
 ---
 **Example 9 (Paragraph Block Format - NEW & RELEVANT):**
 Text: '''
@@ -404,47 +351,67 @@ JQuery: Introduction, Loading JQuery, selecting elements, changing styles, creat
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": null,
-      "module_title": "Introduction",
-      "description": "Introduction to web technology, Internet and WWW, web site planning and design issues, HTML5: structure of html document, commenting, formatting tags, list tags, hyperlink tags, image, table tags, frame tags, form tags, CSS, Bootstrap, JSON(6Hrs)"
-    },
-    {
-      "module_number": null,
-      "module_title": "Client Side Technologies",
-      "description": "JavaScript: Overview of JavaScript, Data types, Control Structures, Arrays, Functions and Scopes, Objects in JS, Form validation, DOM: Introduction, DOMlevels, DOM Objects, their properties and methods, Manipulating DOM (6 Mrs)"
-    },
-    {
-      "module_number": null,
-      "module_title": "JQuery",
-      "description": "Introduction, Loading JQuery, selecting elements, changing styles, creating elements, appending elements, removing elements, handling events. (2 Hrs)"
-    }
+    {"module_number": null,"module_title": "Introduction","description": "Introduction to web technology, Internet and WWW, web site planning and design issues, HTML5: structure of html document, commenting, formatting tags, list tags, hyperlink tags, image, table tags, frame tags, form tags, CSS, Bootstrap, JSON(6Hrs)"},
+    {"module_number": null,"module_title": "Client Side Technologies","description": "JavaScript: Overview of JavaScript, Data types, Control Structures, Arrays, Functions and Scopes, Objects in JS, Form validation, DOM: Introduction, DOMlevels, DOM Objects, their properties and methods, Manipulating DOM (6 Mrs)"},
+    {"module_number": null,"module_title": "JQuery","description": "Introduction, Loading JQuery, selecting elements, changing styles, creating elements, appending elements, removing elements, handling events. (2 Hrs)"}
   ]
 }
-
 ---
-**Example 10 (Highly Structured Document - MOST COMPREHENSIVE):**
+
+**Example 10 (Table Format with Topic/Sub-topics):**
 Text: '''
-BMAT102L Differential Equations and Transforms
-Pre-requisite BMAT101L
-Course Objectives
-1. To impart the knowledge of Laplace transform...
-Course Outcomes
-1. Find solution for second and higher order differential equations...
-Module:1 Ordinary Differential Equations (ODE) 6 hours
-Second order non- homogenous differential equations...
-Text Book(s)
-1. Erwin Kreyszig, Advanced Engineering Mathematics...
+"Module number" | "Topic" | "Sub-topics" | "Corresponding Lab Assignment"
+"1" | "1. Rectifiers, Filters and Regulators:" | "Introduction to full-wave and half-wave rectifiers..." | "1. Simulation of full-wave..."
 '''
 JSON Output:
 {
   "modules": [
-    {
-      "module_number": "1",
-      "module_title": "Ordinary Differential Equations (ODE)",
-      "lecture_hours": 6,
-      "description": "Second order non- homogenous differential equations..."
-    }
+    {"Topic": "Rectifiers, Filters and Regulators","Sub-topics": "Introduction to full-wave and half-wave rectifiers. Capacitor filter. Inductor filter, LC and π-section filter. Series and Shunt voltage regulator, percentage regulation. Regulator ICs 78xx and 79xx series. Introduction to SMPS."}
+  ]
+}
+---
+
+**Example 11 (Unstructured Paragraph to Logically Grouped Modules):**
+Text: '''
+Introduction, software life-cycle models, software requirements specification,
+formal requirements specification and verification - axiomatic and algebraic
+specifications, function-oriented software design, object-oriented design, UML,
+design patterns, user interface design, coding and unit testing, integration
+and systems testing, debugging techniques, software quality - SEI CMM and ISO-
+9001. software reliability and fault-tolerance, software project planning,
+monitoring, and control, software maintenance, computer-aided software
+engineering (CASE), software reuse, component-based software development,
+extreme programming.
+'''
+JSON Output:
+{
+  "modules": [
+    { "module_number": null, "module_title": "Introduction and Life-cycle Models", "description": "Introduction; software life-cycle models (waterfall, incremental, evolutionary, spiral) and their trade-offs in planning and risk control." },
+    { "module_number": null, "module_title": "Requirements and Formal Specification", "description": "Software requirements specification (SRS): functional and non-functional requirements, interfaces, structure; formal requirements specification and verification using axiomatic and algebraic methods." },
+    { "module_number": null, "module_title": "Design Approaches and UML", "description": "Function-oriented software design; object-oriented design; UML diagrams for analysis and design; design patterns for recurring design problems; principles of cohesion, coupling, and modularity." },
+    { "module_number": null, "module_title": "User Interface Design", "description": "UI design principles, analysis, prototyping, and evaluation; integrating usability into the software architecture and development process." },
+    { "module_number": null, "module_title": "Coding, Unit, Integration and System Testing", "description": "Coding standards and practices; unit testing with stubs/mocks; integration strategies; system and validation testing; debugging techniques and defect lifecycle." },
+    { "module_number": null, "module_title": "Software Quality and Process Standards", "description": "Software quality concepts, product vs. process quality; SEI CMM/CMMI levels and assessments; ISO 9001 quality management principles and compliance." },
+    { "module_number": null, "module_title": "Reliability and Fault Tolerance", "description": "Software reliability fundamentals, models, and measurement; fault-tolerance techniques including error detection, recovery, and redundancy." },
+    { "module_number": null, "module_title": "Project Planning, Monitoring, and Control", "description": "Estimation, scheduling, staffing, and resource planning; progress monitoring, metrics, status reporting, and risk management practices." },
+    { "module_number": null, "module_title": "Maintenance and Evolution", "description": "Maintenance categories (corrective, adaptive, perfective, preventive); processes, cost drivers, refactoring, and technical debt management." },
+    { "module_number": null, "module_title": "CASE, Reuse, Components, and XP", "description": "Computer-aided software engineering (CASE) tools across lifecycle; software reuse strategies; component-based software development; Extreme Programming (XP) values and practices." }
+  ]
+}
+**Example 12 (Numbered List Inside a Single Text Block - NEW & CRITICAL):**
+Text: '''
+Course Title: Basic Engineering
+Topics Covered:
+1.  Fundamentals of Circuits: Ohm's law, Kirchhoff's laws. (4 hours)
+2.  Basics of Mechanics: Newton's laws of motion, friction. (5 hours)
+3.  Introduction to Programming: Variables, loops, and functions in Python. (6 hours)
+'''
+JSON Output:
+{
+  "modules": [
+    { "module_number": "1", "module_title": "Fundamentals of Circuits", "description": "Fundamentals of Circuits: Ohm's law, Kirchhoff's laws. (4 hours)" },
+    { "module_number": "2", "module_title": "Basics of Mechanics", "description": "Basics of Mechanics: Newton's laws of motion, friction. (5 hours)" },
+    { "module_number": "3", "module_title": "Introduction to Programming", "description": "Introduction to Programming: Variables, loops, and functions in Python. (6 hours)" }
   ]
 }
 """
@@ -482,10 +449,9 @@ JSON Output:
             print(f"Raw response from model: {response.text}")
             raise Exception("The AI model returned an invalid or unexpected format.")
 
-    # ==============================================================================
     # PART III: MAIN PROCESSING WORKFLOW
-    # ==============================================================================
-    def process_syllabus(self, file_path: str) -> Dict[str, Any]:
+     
+      def process_syllabus(self, file_path: str) -> Dict[str, Any]:
         """
         Executes the full, AI-powered pipeline from file to structured module data.
         """
@@ -515,14 +481,18 @@ JSON Output:
 
             formatted_modules = []
             for i, mod in enumerate(modules):
-                # *** FIX IS HERE ***
-                # Handle cases where the description is null (None) from the API
-                content = mod.get("description") or "No description available."
+                if "Topic" in mod:
+                   title = mod.get("Topic", "Untitled Topic")
+                   content = mod.get("Sub-topics", "No sub-topics available.")
+                else:
+                   title = mod.get("module_title", "Untitled Module")
+                   content = mod.get("description") or "No description available."
+
                 formatted_modules.append({
-                    "id": f"module_{i + 1}",
-                    "title": mod.get("module_title", "Untitled Module"),
-                    "content": content
-                })
+                "id": f"module_{i + 1}",
+                "title": title,
+                "content": content
+            })
 
             return {
                 "success": True,
@@ -535,9 +505,7 @@ JSON Output:
                 },
                 "stats": {
                     "total_modules": len(formatted_modules),
-                    "average_content_length": round(
-                        sum(len(m["content"]) for m in formatted_modules) / len(formatted_modules)
-                    ) if formatted_modules else 0,
+                   "average_content_length": round(sum(len(m.get("content", "")) for m in formatted_modules) / len(formatted_modules)) if formatted_modules else 0,
                 },
             }
 
@@ -553,15 +521,12 @@ JSON Output:
                     "error_type": e.__class__.__name__,
                 },
             }
-
+            
 if __name__ == "__main__":
-    # Example usage:
-    # 1. Make sure you have a file named 'Syllabus.pdf' in the same directory.
-    # 2. Make sure you have set your GROQ_API_KEY in Colab Secrets or a .env file.
-    if os.path.exists("Udaipur.pdf"):
+    if os.path.exists("Syllabus.pdf"):
         try:
             processor = SyllabusProcessor()
-            result = processor.process_syllabus("Udaipur.pdf")
+            result = processor.process_syllabus("Syllabus.pdf")
 
             if result["success"]:
                 print("\n--- Processing Successful ---")
@@ -572,4 +537,4 @@ if __name__ == "__main__":
         except ValueError as e:
             print(f"Configuration Error: {e}")
     else:
-        print("Please create a 'Udaipur.pdf' file to run the test.")
+        print("Please create a 'Syllabus.pdf' file to run the test.")
