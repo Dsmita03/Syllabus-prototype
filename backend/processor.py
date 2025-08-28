@@ -1,9 +1,16 @@
 # ==============================================================================
-# AI-Powered Syllabus Processor (Using Groq Cloud API)
+# AI-Powered Syllabus Processor (Using Groq Cloud API) - v2 (Robust Version)
 # ==============================================================================
 # This script uses an advanced "master prompt" with multiple examples to handle
-# a wide variety of unstructured syllabus formats using a robust OCR and
-# digital text extraction pipeline. It does NOT require nougat-ocr.
+# a wide variety of unstructured syllabus formats.
+#
+# v2 Changes:
+# - Added a pre-processing step to clean and trim text before sending to the AI.
+# - Implemented text chunking to handle very long syllabi and prevent the
+#   "413 Payload Too Large" API error.
+# - Added a retry mechanism with exponential backoff to handle "429 Too Many
+#   Requests" rate-limiting errors.
+# - Made the main processing pipeline more robust and resilient.
 #
 # Setup Instructions:
 # 1.  Go to https://console.groq.com/keys and sign up for a free account.
@@ -24,6 +31,8 @@
 import os
 import requests
 import json
+import re
+import time
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
@@ -43,6 +52,9 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL_NAME = "llama3-8b-8192"
 # DPI for rendering PDF pages to images for OCR
 OCR_DPI = 300
+# Character limit for text chunks sent to the API.
+# This value is chosen conservatively to leave room for the large system prompt.
+TEXT_CHUNK_SIZE = 4000
 
 
 class SyllabusProcessor:
@@ -53,6 +65,10 @@ class SyllabusProcessor:
         # For Google Colab, it's better to use the userdata library
         try:
             self.api_key = os.getenv("GROQ_API_KEY")
+            if not self.api_key:
+                 # Fallback for local dev if Colab-specific method fails
+                 from google.colab import userdata
+                 self.api_key = userdata.get("GROQ_API_KEY")
             print("Loaded GROQ_API_KEY from Colab Secrets.")
         except (ImportError, KeyError):
             self.api_key = os.getenv("GROQ_API_KEY")
@@ -63,9 +79,9 @@ class SyllabusProcessor:
 
         print("SyllabusProcessor initialized with Groq API.")
 
- 
+
     # PART I: ROBUST PDF & TEXT EXTRACTION
-   
+
       def _extract_text_with_table_detection(self, doc: fitz.Document) -> (str, bool):
           """
           Specialized method for PDFs with clear table structures.
@@ -73,11 +89,8 @@ class SyllabusProcessor:
           full_text = ""
           table_char_count = 0
           for page in doc:
-              # FIX: Convert the finder object to a list of tables first.
              table_list = page.find_tables().tables
-        
              if table_list:
-                # Now, you can safely use len() on the list.
                 print(f"Found {len(table_list)} table(s) on page {page.number + 1}.")
                 for table in table_list:
                     extracted_table = table.extract()
@@ -86,8 +99,6 @@ class SyllabusProcessor:
                            row_text = " | ".join(str(cell).replace('\n', ' ') if cell is not None else "" for cell in row)
                            full_text += row_text + "\n"
                            table_char_count += len(row_text)
-                        
-           # Consider it successful only if a significant amount of text was found in tables
           is_successful = table_char_count > 500
           return full_text, is_successful
 
@@ -111,7 +122,6 @@ class SyllabusProcessor:
             images = convert_from_path(pdf_path, dpi=OCR_DPI)
             full_text = ""
             print(f"Converted PDF to {len(images)} image(s) for OCR.")
-
             for i, img in enumerate(images):
                 print(f"Processing page {i+1} with OCR...")
                 open_cv_image = np.array(img)
@@ -119,15 +129,12 @@ class SyllabusProcessor:
                 _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
                 text = pytesseract.image_to_string(thresh, lang='eng')
                 full_text += text + f"\n\n--- Page {i+1} End ---\n\n"
-
             is_successful = len(full_text.strip()) > 0
             print(f"OCR extraction yielded {len(full_text.strip())} characters.")
             return full_text, is_successful
         except Exception as e:
             print(f"Error processing {pdf_path} with OCR: {e}")
             return "", False
-
-      # FILE: processor.py
 
       def _get_text_from_pdf(self, pdf_path: str) -> str:
         """
@@ -137,26 +144,19 @@ class SyllabusProcessor:
             doc = fitz.open(pdf_path)
         except Exception as e:
             raise Exception(f"Error opening {pdf_path} with PyMuPDF: {e}")
-
-        # CHANGED: Attempt general block extraction FIRST. It is more reliable.
         print("Step 1: Attempting general block extraction...")
         text, success = self._extract_text_with_block_detection(doc)
         if success:
             print("General block extraction successful.")
             doc.close()
             return text
-
-        # CHANGED: Fallback to specialized table extraction only if block fails.
         print("Block extraction not suitable. Falling back to table extraction...")
         text, success = self._extract_text_with_table_detection(doc)
         if success:
             print("Table extraction successful. Using this method.")
             doc.close()
             return text
-        
         doc.close()
-
-        # Final fallback to OCR remains the same.
         print("Digital extraction yielded poor results. Falling back to OCR...")
         text, success = self._ocr_scanned_pdf(pdf_path)
         if success:
@@ -173,31 +173,32 @@ class SyllabusProcessor:
         except Exception as e:
             raise Exception(f"Error reading text file: {e}")
 
-     
-    # PART II: AI-POWERED MODULE EXTRACTION (ADVANCED PROMPT)
-    
+    # PART II: AI-POWERED MODULE EXTRACTION (ADVANCED PROMPT & RESILIENT)
+
       def _extract_modules_with_llm(self, syllabus_text: str) -> List[Dict[str, Any]]:
         """
-        Sends the syllabus text to the Groq API to extract modules.
-        The prompt has been significantly enhanced with new examples to handle diverse formats.
+        Sends a CHUNK of syllabus text to the Groq API to extract modules.
+        This version includes a retry mechanism with exponential backoff to handle rate limits.
         """
-        print("\nStep 2: Sending text to Groq API for module extraction...")
-
+        # The system prompt remains unchanged as it is highly effective.
         system_prompt = """
-You are an expert academic data extraction system. 
-Your task is to extract structured academic content (modules, units, topics) 
+You are an expert academic data extraction system.
+Your task is to extract structured academic content (modules, units, topics)
 from diverse syllabus texts into a JSON format.
 
 **Instructions:**
 1.  **Exhaustive Processing**: You MUST process the ENTIRE syllabus text from beginning to end and identify ALL distinct modules, topics, or units. Do not stop after finding the first one.
 2.  **Segmentation and Logic**:
     * For each module, create a concise `module_title`. The text that follows the heading is the `description`. **Crucially, do not include the description text inside the title.**
-    * If a large text block contains an internal numbered or bulleted list (like in Example 13), you MUST split each item in that list into its own separate module.
+    * If a large text block contains an internal numbered or bulleted list (like in Example 12), you MUST split each item in that list into its own separate module.
 3.  **Schema and Fields**:
     * Use the appropriate schema ('Module/Unit' style or 'Topic/Sub-topics' style).
     * Return ONLY the fields genuinely present in the text. Use `null` for unavailable fields.
 4.  **Output Format**: Your entire output must be a single, valid JSON object.
-5.  **Ignore Metadata**: Ignore course objectives, outcomes, and other metadata. Only extract the distinct academic topic modules.
+5.  **Boundary Detection and Metadata Handling**: Your primary task is to extract the core list of academic modules/units. You MUST actively ignore all surrounding metadata. This includes, but is not limited to:
+    * **Preamble**: Course Objectives, Course Learning Rationale (CLR), Program Outcomes (PO), Prerequisites, Course Code, Credits.
+    * **Postamble**: Course Outcomes (COs), Textbooks, Reference Books, Evaluation Schemes, Grading Policies.
+    * **CRITICAL RULE**: Begin the extraction process ONLY from the line containing a heading like "Course Contents", "Syllabus", "Detailed Syllabus", or the very first "Unit I" / "Module 1". DISCARD ALL TEXT that comes before this starting point. Similarly, stop the extraction immediately when you encounter a heading like "Course Outcomes", "Textbooks", or "Reference books".
 
 **Schemas:**
 Case A – Module/Unit style:
@@ -327,7 +328,7 @@ JSON Output:
   ]
 }
 ---
-**Example 8 (Highly Structured Table Format - NEW & MOST RELEVANT):**
+**Example 8 (Highly Structured Table Format):**
 Text: '''
 "Unit No.","Topics to be Covered","Lecture Hours","Learning Outcome"
 "1","Introduction: Need of compilers; Cousins of compilers; Compiler writing tools, compiler phases.","2","The students will be introduced with the language translator, their need and various phases of a compiler."
@@ -341,7 +342,7 @@ JSON Output:
   ]
 }
 ---
-**Example 9 (Paragraph Block Format - NEW & RELEVANT):**
+**Example 9 (Paragraph Block Format):**
 Text: '''
 SECTION-1
 Introduction: Introduction to web technology, Internet and WWW, web site planning and design issues, HTML5: structure of html document, commenting, formatting tags, list tags, hyperlink tags, image, table tags, frame tags, form tags, CSS, Bootstrap, JSON(6Hrs)
@@ -357,7 +358,6 @@ JSON Output:
   ]
 }
 ---
-
 **Example 10 (Table Format with Topic/Sub-topics):**
 Text: '''
 "Module number" | "Topic" | "Sub-topics" | "Corresponding Lab Assignment"
@@ -370,7 +370,6 @@ JSON Output:
   ]
 }
 ---
-
 **Example 11 (Unstructured Paragraph to Logically Grouped Modules):**
 Text: '''
 Introduction, software life-cycle models, software requirements specification,
@@ -398,7 +397,8 @@ JSON Output:
     { "module_number": null, "module_title": "CASE, Reuse, Components, and XP", "description": "Computer-aided software engineering (CASE) tools across lifecycle; software reuse strategies; component-based software development; Extreme Programming (XP) values and practices." }
   ]
 }
-**Example 12 (Numbered List Inside a Single Text Block - NEW & CRITICAL):**
+---
+**Example 12 (Numbered List Inside a Single Text Block):**
 Text: '''
 Course Title: Basic Engineering
 Topics Covered:
@@ -412,6 +412,41 @@ JSON Output:
     { "module_number": "1", "module_title": "Fundamentals of Circuits", "description": "Fundamentals of Circuits: Ohm's law, Kirchhoff's laws. (4 hours)" },
     { "module_number": "2", "module_title": "Basics of Mechanics", "description": "Basics of Mechanics: Newton's laws of motion, friction. (5 hours)" },
     { "module_number": "3", "module_title": "Introduction to Programming", "description": "Introduction to Programming: Variables, loops, and functions in Python. (6 hours)" }
+  ]
+}
+---
+**Example 13 (Content Boundary Detection):**
+Text: '''
+Course Objectives: To learn about programming.
+Course Contents:
+Unit I
+Introduction to Python: Variables, data types, and basic syntax.
+Unit II
+Control Flow: If statements, for loops, while loops.
+Course Outcome: Students will be able to write simple programs.
+Textbooks:
+1. Learning Python by Mark Lutz.
+'''
+JSON Output:
+{
+  "modules": [
+    {"module_number": "I","module_title": "Introduction to Python","description": "Variables, data types, and basic syntax."},
+    {"module_number": "II","module_title": "Control Flow","description": "If statements, for loops, while loops."}
+  ]
+}
+---
+**Example 14 (Complex Unit Heading Format - NEW & CRITICAL):**
+Text: '''
+Unit-1-Introduction to Microwaves and Sources 9 Hour
+History of Microwave Engineering, Microwave transmission and Applications, Microwave Tubes, Klystron amplifier, Reflex Klystron oscillators, Magnetron oscillators, IMPATT, TRAPATT, Tunnel diode, Gunn diode.
+Unit-3-Microwave Measurements 9 Hour
+mpedance and Power measurement, Measurement of Frequency, Attenuation, Scattering parameters, Vector Network Analyzer, Signal Analyzer and Spectrum Analyzer Case study on VSWR and Impedance measurement
+'''
+JSON Output:
+{
+  "modules": [
+    {"module_number": "1","module_title": "Introduction to Microwaves and Sources","description": "History of Microwave Engineering, Microwave transmission and Applications, Microwave Tubes, Klystron amplifier, Reflex Klystron oscillators, Magnetron oscillators, IMPATT, TRAPATT, Tunnel diode, Gunn diode."},
+    {"module_number": "3","module_title": "Microwave Measurements","description": "mpedance and Power measurement, Measurement of Frequency, Attenuation, Scattering parameters, Vector Network Analyzer, Signal Analyzer and Spectrum Analyzer Case study on VSWR and Impedance measurement"}
   ]
 }
 """
@@ -430,57 +465,141 @@ JSON Output:
             "response_format": {"type": "json_object"}
         }
 
-        try:
-            response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=300)
-            response.raise_for_status()
+        max_retries = 5
+        base_delay = 1  # start with a 1-second delay
 
-            response_data = response.json()
-            json_output_str = response_data['choices'][0]['message']['content']
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=300)
+                
+                if response.status_code == 429:
+                    response.raise_for_status() 
 
-            extracted_data = json.loads(json_output_str)
-            print("Successfully extracted structured data from Groq API.")
+                response.raise_for_status()
+                
+                response_data = response.json()
+                json_output_str = response_data['choices'][0]['message']['content']
+                extracted_data = json.loads(json_output_str)
+                
+                return extracted_data.get("modules", [])
 
-            return extracted_data.get("modules", [])
+            except requests.exceptions.RequestException as e:
+                if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 429:
+                    if attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)
+                        print(f"Rate limit hit. Retrying in {delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                        time.sleep(delay)
+                    else:
+                        raise Exception(f"API rate limit exceeded after {max_retries} attempts. Please wait and try again later.")
+                else:
+                    raise Exception(f"API request to Groq failed: {e}")
+            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                print(f"Failed to parse JSON from Groq response: {e}")
+                print(f"Raw response from model: {response.text}")
+                raise Exception("The AI model returned an invalid or unexpected format.")
+        
+        return []
 
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"API request to Groq failed: {e}")
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
-            print(f"Failed to parse JSON from Groq response: {e}")
-            print(f"Raw response from model: {response.text}")
-            raise Exception("The AI model returned an invalid or unexpected format.")
+    # PART III: MAIN PROCESSING WORKFLOW (MODIFIED FOR ROBUSTNESS)
 
-    # PART III: MAIN PROCESSING WORKFLOW
-     
+      def _clean_and_trim_text(self, text: str) -> str:
+        """
+        Removes preamble and postamble from syllabus text based on keywords.
+        This is a crucial step to reduce payload size and improve AI focus.
+        """
+        start_keywords = [
+            "Detailed Syllabus", "Syllabus", "Course Contents",
+            "Course Content", "Unit I", "Module 1"
+        ]
+        end_keywords = [
+            "Course Outcome", "Text book and Reference books", "Text Book",
+            "Reference books", "Textbook", "Evaluation Scheme"
+        ]
+
+        start_pattern = "|".join(map(re.escape, start_keywords))
+        end_pattern = "|".join(map(re.escape, end_keywords))
+
+        start_match = re.search(start_pattern, text, re.IGNORECASE)
+        if start_match:
+            text = text[start_match.start():]
+
+        end_match = re.search(end_pattern, text, re.IGNORECASE)
+        if end_match:
+            text = text[:end_match.start()]
+
+        return text.strip()
+
+
+      def _split_text_into_chunks(self, text: str) -> List[str]:
+          """
+          Splits text into chunks of a specified size without breaking words.
+          """
+          if len(text) <= TEXT_CHUNK_SIZE:
+              return [text]
+
+          chunks = []
+          while text:
+              if len(text) <= TEXT_CHUNK_SIZE:
+                  chunks.append(text)
+                  break
+              split_pos = text.rfind('\n', 0, TEXT_CHUNK_SIZE)
+              if split_pos == -1:
+                  split_pos = text.rfind(' ', 0, TEXT_CHUNK_SIZE)
+
+              if split_pos == -1:
+                  split_pos = TEXT_CHUNK_SIZE
+
+              chunks.append(text[:split_pos])
+              text = text[split_pos:].lstrip()
+          return chunks
+
+
       def process_syllabus(self, file_path: str) -> Dict[str, Any]:
         """
         Executes the full, AI-powered pipeline from file to structured module data.
+        Now includes pre-processing and chunking for robustness.
         """
         try:
             print(f"Starting AI-powered syllabus processing: {os.path.basename(file_path)}")
 
             print("Extracting text from file...")
             if file_path.lower().endswith(".pdf"):
-                text = self._get_text_from_pdf(file_path)
+                full_text = self._get_text_from_pdf(file_path)
             elif file_path.lower().endswith(".txt"):
-                text = self._extract_text_from_txt(file_path)
+                full_text = self._extract_text_from_txt(file_path)
             else:
                 raise Exception("Unsupported file format.")
 
-            if not text or not text.strip():
+            if not full_text or not full_text.strip():
                 raise Exception("No readable text found in the uploaded file")
 
-            print(f"Text extraction successful: {len(text):,} characters extracted")
+            print(f"Text extraction successful: {len(full_text):,} characters extracted")
 
-            print("Analyzing content with AI and creating modules...")
-            modules = self._extract_modules_with_llm(text)
+            print("Pre-processing text to remove irrelevant sections...")
+            cleaned_text = self._clean_and_trim_text(full_text)
+            print(f"Text cleaned. New length: {len(cleaned_text):,} characters.")
 
-            if not modules:
+            if not cleaned_text:
+                raise Exception("No relevant syllabus content found after cleaning.")
+
+            text_chunks = self._split_text_into_chunks(cleaned_text)
+            print(f"Text split into {len(text_chunks)} chunk(s) for processing.")
+
+            all_modules = []
+            for i, chunk in enumerate(text_chunks):
+                print(f"\nAnalyzing chunk {i+1}/{len(text_chunks)} with AI...")
+                modules_from_chunk = self._extract_modules_with_llm(chunk)
+                if modules_from_chunk:
+                    all_modules.extend(modules_from_chunk)
+                    print(f"AI extracted {len(modules_from_chunk)} modules from this chunk.")
+
+            if not all_modules:
                 raise Exception("AI could not identify any modules from the text.")
 
-            print(f"AI successfully created {len(modules)} learning modules")
+            print(f"\nAI successfully created a total of {len(all_modules)} learning modules.")
 
             formatted_modules = []
-            for i, mod in enumerate(modules):
+            for i, mod in enumerate(all_modules):
                 if "Topic" in mod:
                    title = mod.get("Topic", "Untitled Topic")
                    content = mod.get("Sub-topics", "No sub-topics available.")
@@ -489,14 +608,14 @@ JSON Output:
                    content = mod.get("description") or "No description available."
 
                 formatted_modules.append({
-                "id": f"module_{i + 1}",
-                "title": title,
-                "content": content
-            })
+                    "id": f"module_{i + 1}",
+                    "title": title,
+                    "content": content
+                })
 
             return {
                 "success": True,
-                "original_text_length": len(text),
+                "original_text_length": len(full_text),
                 "modules": formatted_modules,
                 "extraction_method": "AI-Powered (Groq API)",
                 "processing_info": {
@@ -521,12 +640,15 @@ JSON Output:
                     "error_type": e.__class__.__name__,
                 },
             }
-            
+
 if __name__ == "__main__":
-    if os.path.exists("Syllabus.pdf"):
+    # Example usage: Change the file name to test different syllabi
+    SYLLABUS_FILE = "Syllabus.pdf" # <-- Change this to your test file
+
+    if os.path.exists(SYLLABUS_FILE):
         try:
             processor = SyllabusProcessor()
-            result = processor.process_syllabus("Syllabus.pdf")
+            result = processor.process_syllabus(SYLLABUS_FILE)
 
             if result["success"]:
                 print("\n--- Processing Successful ---")
@@ -537,4 +659,4 @@ if __name__ == "__main__":
         except ValueError as e:
             print(f"Configuration Error: {e}")
     else:
-        print("Please create a 'Syllabus.pdf' file to run the test.")
+        print(f"Please create or place '{SYLLABUS_FILE}' in the same directory to run the test.")

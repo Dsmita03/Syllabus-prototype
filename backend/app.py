@@ -9,7 +9,6 @@ import time
 import logging
 
 # App setup
- 
 app = Flask(__name__)
 CORS(app)
 
@@ -32,8 +31,9 @@ processor = SyllabusProcessor()
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
  
+PROCESSING_FILES = set()
+
 # Helpers
 def allowed_file(filename: str) -> bool:
     if '.' not in filename:
@@ -50,7 +50,7 @@ def find_uploaded_file_by_id(prefix_id: str) -> str | None:
     return None
 
 # Routes
- 
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Simple health check endpoint"""
@@ -101,44 +101,54 @@ def process_syllabus():
     if not file_id:
         return jsonify({'success': False, 'error': 'No file ID provided'}), 400
 
+    # Locking mechanism to prevent parallel processing
+    if file_id in PROCESSING_FILES:
+        logger.warning(f"Attempted to process an already processing file: {file_id}")
+        return jsonify({'success': False, 'error': 'This file is already being processed. Please wait.'}), 409 # 409 Conflict
+
     uploaded_file = find_uploaded_file_by_id(file_id)
     if not uploaded_file:
         return jsonify({'success': False, 'error': 'File not found'}), 404
 
-    logger.info(f"Processing file: {uploaded_file}")
-
     try:
+        # Add the file ID to the set to "lock" it
+        PROCESSING_FILES.add(file_id)
+        logger.info(f"Processing file: {uploaded_file}")
+
         result = processor.process_syllabus(uploaded_file)
-    except Exception:
-        logger.exception("Processing error")
-        return jsonify({'success': False, 'error': 'Processing failed'}), 500
+        
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Processing failed')}), 500
 
-    if not result.get('success'):
-        return jsonify({'success': False, 'error': result.get('error', 'Processing failed')}), 500
+        # Save results with new session_id
+        session_id = str(uuid.uuid4())
+        result.update({
+            'processed_at': time.time(),
+            'session_id': session_id,
+        })
 
-    # Save results with new session_id
-    session_id = str(uuid.uuid4())
-    result.update({
-        'processed_at': time.time(),
-        'session_id': session_id,
-    })
-
-    result_path = os.path.join(DATA_FOLDER, f"{session_id}.json")
-    try:
+        result_path = os.path.join(DATA_FOLDER, f"{session_id}.json")
         with open(result_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
-    except Exception:
-        logger.exception("Error saving result data")
-        return jsonify({'success': False, 'error': 'Failed to save results'}), 500
 
-    logger.info(f"Processing completed. Session ID: {session_id}, Modules: {len(result.get('modules', []))}")
+        logger.info(f"Processing completed. Session ID: {session_id}, Modules: {len(result.get('modules', []))}")
 
-    return jsonify({
-        'success': True,
-        'session_id': session_id,
-        'modules_count': len(result.get('modules', [])),
-        'message': 'Processing completed successfully'
-    }), 200
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'modules_count': len(result.get('modules', [])),
+            'message': 'Processing completed successfully'
+        }), 200
+
+    except Exception as e:
+        logger.exception("Processing error during main execution")
+        return jsonify({'success': False, 'error': f'An unexpected error occurred: {str(e)}'}), 500
+    
+    finally:
+         
+        # Ensure the lock is released whether the process succeeds or fails.
+        if file_id in PROCESSING_FILES:
+            PROCESSING_FILES.remove(file_id)
 
 
 @app.route('/api/results', methods=['GET'])

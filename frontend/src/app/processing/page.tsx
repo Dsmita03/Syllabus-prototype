@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle, ArrowLeft, FileText, Brain, Target, Zap } from 'lucide-react';
+import { CheckCircle, ArrowLeft, FileText, Brain, Target } from 'lucide-react';
 
 export default function ProcessingPage() {
   const [progress, setProgress] = useState(0);
@@ -16,28 +16,22 @@ export default function ProcessingPage() {
 
   const processingSteps = [
     { 
-      progress: 25, 
+      progress: 33, 
       status: 'Reading document...', 
       delay: 1000, 
       icon: FileText,
     },
     { 
-      progress: 50, 
+      progress: 67, 
       status: 'Analyzing content...', 
       delay: 1500, 
       icon: Brain,
     },
     { 
-      progress: 75, 
+      progress: 100, 
       status: 'Creating modules...', 
       delay: 1000, 
       icon: Target,
-    },
-    { 
-      progress: 100, 
-      status: 'Generating questions...', 
-      delay: 2000, 
-      icon: Zap,
     },
   ];
 
@@ -207,7 +201,7 @@ export default function ProcessingPage() {
           {/* Tip */}
           <div className="mt-8 p-4 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20 rounded-lg border border-[#D9C4B0]/30">
             <p className="text-sm text-gray-700">
-              <span className="font-semibold text-[#BBDCE5]">💡 Tip:</span> Our AI analyzes your content structure and creates personalized questions for better learning outcomes.
+              <span className="font-semibold text-[#BBDCE5]">💡 Tip:</span> Our AI analyzes your content structure to create focused study modules.
             </p>
           </div>
 

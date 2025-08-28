@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import ModuleCard from '@/components/ModuleCard';
-import QuestionList from '@/components/QuestionList';
-import { Printer,Home,BookOpen,HelpCircle,FileText,Clock,Target,Play,CheckCircle,Bookmark,Brain,ArrowLeft} from 'lucide-react';
+import { Printer, Home, BookOpen, HelpCircle, FileText, Clock,Play, CheckCircle, Bookmark, Brain, ArrowLeft } from 'lucide-react';
+
 interface Module {
   id: string;
   title: string;
@@ -153,7 +153,7 @@ export default function ResultsPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="grid lg:grid-cols-12 gap-8">
-          {/* Left Sidebar - Module List - EXPANDED */}
+          {/* Left Sidebar - Module List */}
           <aside className="lg:col-span-5">
             <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 sticky top-24">
               {/* Module List Header */}
@@ -166,8 +166,8 @@ export default function ResultsPage() {
                 </div>
                 <p className="text-gray-600 text-sm">Select a module to view content</p>
               </div>
-              
-              {/* Module Cards - EXPANDED HEIGHT */}
+
+              {/* Module Cards */}
               <div className="p-4 space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto">
                 {modules.map((module, index) => (
                   <ModuleCard
@@ -186,7 +186,7 @@ export default function ResultsPage() {
             </div>
           </aside>
 
-          {/* Right Content Area - ADJUSTED WIDTH */}
+          {/* Right Content Area */}
           <section className="lg:col-span-7">
             {currentModule ? (
               <div className="space-y-6">
@@ -209,18 +209,28 @@ export default function ResultsPage() {
                       
                       {/* Module Meta Info */}
                       <div className="flex items-center space-x-4 text-sm mb-4">
-                        <span className="flex items-center px-3 py-1 bg-[#BBDCE5]/20 text-[#BBDCE5] rounded-full font-medium border border-[#BBDCE5]/30">
-                          <HelpCircle className="w-4 h-4 mr-1" />
-                          {currentModule.questions?.length || 0} Questions
-                        </span>
+                        {currentModule.questions && currentModule.questions.length > 0 && (
+                          <span className="flex items-center px-3 py-1 bg-[#BBDCE5]/20 text-[#BBDCE5] rounded-full font-medium border border-[#BBDCE5]/30">
+                            <HelpCircle className="w-4 h-4 mr-1" />
+                            {currentModule.questions.length} Questions
+                          </span>
+                        )}
                         <span className="flex items-center px-3 py-1 bg-[#D9C4B0]/20 text-[#CFAB8D] rounded-full font-medium border border-[#D9C4B0]/30">
                           <Clock className="w-4 h-4 mr-1" />
                           {Math.ceil(currentModule.content.split(' ').length / 200)} min read
                         </span>
                       </div>
-                      
-                      {/* Action Buttons */}
+          
                       <div className="flex items-center space-x-3">
+                        {currentModule.questions && currentModule.questions.length > 0 && (
+                          <button
+                            onClick={() => router.push(`/quiz?moduleId=${currentModule.id}`)}
+                            className="flex items-center px-4 py-2 bg-[#BBDCE5] text-white rounded-lg hover:bg-[#a5cfd8] transition-colors font-medium"
+                          >
+                            <Play className="w-4 h-4 mr-2" />
+                            Start Quiz
+                          </button>
+                        )}
                         <button
                           onClick={() => markAsCompleted(currentModule.id)}
                           className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors border ${
@@ -263,36 +273,6 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Questions Section */}
-                {currentModule.questions && currentModule.questions.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30">
-                    <div className="flex items-center justify-between p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#D9C4B0]/20">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-[#D9C4B0] rounded-lg flex items-center justify-center">
-                          <Target className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <h4 className="text-xl font-bold text-gray-900">Practice Questions</h4>
-                          <p className="text-gray-600 text-sm">Test your understanding</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3">
-                        <span className="px-3 py-1 bg-[#D9C4B0] text-white font-semibold rounded-lg text-sm">
-                          {currentModule.questions.length} Questions
-                        </span>
-                        <button className="flex items-center px-4 py-2 bg-[#BBDCE5] text-white rounded-lg hover:bg-[#a5cfd8] transition-colors">
-                          <Play className="w-4 h-4 mr-2" />
-                          Start Quiz
-                        </button>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <QuestionList questions={currentModule.questions} />
-                    </div>
-                  </div>
-                )}
               </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 p-16 text-center">
