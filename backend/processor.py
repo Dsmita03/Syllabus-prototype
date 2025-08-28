@@ -102,7 +102,7 @@ class SyllabusProcessor:
           is_successful = table_char_count > 500
           return full_text, is_successful
 
-      def _extract_text_with_block_detection(self, doc: fitz.Document) -> (str, bool):
+      def _extract_text_with_block_detection(self, doc: fitz.Document) -> Tuple[str, bool]:
         """
         General purpose method for unstructured or semi-structured PDFs.
         """
@@ -114,7 +114,7 @@ class SyllabusProcessor:
         is_successful = len(full_text.strip()) > 200
         return full_text, is_successful
 
-      def _ocr_scanned_pdf(self, pdf_path: str) -> (str, bool):
+      def _ocr_scanned_pdf(self, pdf_path: str) -> Tuple[str, bool]:
         """
         Performs OCR on a scanned PDF using Tesseract after pre-processing images.
         """
@@ -201,13 +201,13 @@ from diverse syllabus texts into a JSON format.
     * **CRITICAL RULE**: Begin the extraction process ONLY from the line containing a heading like "Course Contents", "Syllabus", "Detailed Syllabus", or the very first "Unit I" / "Module 1". DISCARD ALL TEXT that comes before this starting point. Similarly, stop the extraction immediately when you encounter a heading like "Course Outcomes", "Textbooks", or "Reference books".
 
 **Schemas:**
-Case A – Module/Unit style:
+Case A - Module/Unit style:
 {
   "modules": [
     {"module_number": "string or null","module_title": "string","description": "string","learning_outcome": "string or null"}
   ]
 }
-Case B – Topic/Sub-topics style (Use for table formats with these specific column headers):
+Case B - Topic/Sub-topics style (Use for table formats with these specific column headers):
 {
   "modules": [
     { "Topic": "string", "Sub-topics": "string" }
