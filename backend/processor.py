@@ -24,7 +24,7 @@
 import os
 import requests
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from dotenv import load_dotenv
 
 # --- AI and PDF Processing Imports ---
@@ -66,7 +66,7 @@ class SyllabusProcessor:
  
     # PART I: ROBUST PDF & TEXT EXTRACTION
    
-      def _extract_text_with_table_detection(self, doc: fitz.Document) -> (str, bool):
+      def _extract_text_with_table_detection(self, doc: fitz.Document) -> Tuple[str, bool]:
           """
           Specialized method for PDFs with clear table structures.
           """
@@ -91,7 +91,7 @@ class SyllabusProcessor:
           is_successful = table_char_count > 500
           return full_text, is_successful
 
-      def _extract_text_with_block_detection(self, doc: fitz.Document) -> (str, bool):
+      def _extract_text_with_block_detection(self, doc: fitz.Document) -> Tuple[str, bool]:
         """
         General purpose method for unstructured or semi-structured PDFs.
         """
@@ -103,7 +103,7 @@ class SyllabusProcessor:
         is_successful = len(full_text.strip()) > 200
         return full_text, is_successful
 
-      def _ocr_scanned_pdf(self, pdf_path: str) -> (str, bool):
+      def _ocr_scanned_pdf(self, pdf_path: str) -> Tuple[str, bool]:
         """
         Performs OCR on a scanned PDF using Tesseract after pre-processing images.
         """
@@ -200,13 +200,13 @@ from diverse syllabus texts into a JSON format.
 5.  **Ignore Metadata**: Ignore course objectives, outcomes, and other metadata. Only extract the distinct academic topic modules.
 
 **Schemas:**
-Case A – Module/Unit style:
+Case A - Module/Unit style:
 {
   "modules": [
     {"module_number": "string or null","module_title": "string","description": "string","learning_outcome": "string or null"}
   ]
 }
-Case B – Topic/Sub-topics style (Use for table formats with these specific column headers):
+Case B - Topic/Sub-topics style (Use for table formats with these specific column headers):
 {
   "modules": [
     { "Topic": "string", "Sub-topics": "string" }
@@ -430,6 +430,7 @@ JSON Output:
             "response_format": {"type": "json_object"}
         }
 
+        response = None
         try:
             response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=300)
             response.raise_for_status()
@@ -446,7 +447,11 @@ JSON Output:
             raise Exception(f"API request to Groq failed: {e}")
         except (json.JSONDecodeError, KeyError, IndexError) as e:
             print(f"Failed to parse JSON from Groq response: {e}")
-            print(f"Raw response from model: {response.text}")
+            # Only print response text if response is defined
+            if response is not None:
+                print(f"Raw response from model: {response.text}")
+            else:
+                print("No response received from API")
             raise Exception("The AI model returned an invalid or unexpected format.")
 
     # PART III: MAIN PROCESSING WORKFLOW
