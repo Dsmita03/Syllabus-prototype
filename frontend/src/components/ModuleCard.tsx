@@ -52,33 +52,34 @@ export default function ModuleCard({
       className={`
         group relative overflow-hidden rounded-xl cursor-pointer transition-all duration-200 border
         ${isSelected
-          ? 'bg-gradient-to-r from-[#BBDCE5] to-[#D9C4B0] text-gray-900 shadow-lg border-[#BBDCE5] scale-[1.03]'
+          ? 'bg-gradient-to-br from-[#E8F4F8] via-[#F5E6D3] to-[#E6D5C3] text-gray-900 shadow-lg border-[#BBDCE5] scale-[1.03]'
           : 'bg-white hover:bg-[#BBDCE5]/10 text-gray-900 shadow-sm border-[#ECEEDF] hover:border-[#BBDCE5]/60'
         }
       `}
       style={{ minHeight: 120 }}
     >
       <div className="p-5">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center space-x-3">
-            <div className={`
-              w-9 h-9 rounded-lg flex items-center justify-center font-bold text-base
-              ${isSelected ? 'bg-[#ECEEDF] text-[#BBDCE5]' : 'bg-[#BBDCE5] text-white'}
-            `}>
-              {index + 1}
-            </div>
-            <h3 className={`font-bold text-base truncate ${isSelected ? 'text-[#CFAB8D]' : 'text-gray-900'}`}>
+         {/* Header */}
+        <div className="flex items-baseline gap-3 mb-2">
+          <div className={`
+            w-9 h-9 rounded-lg flex items-center justify-center font-bold text-base flex-shrink-0
+            ${isSelected ? 'bg-[#f8f8f2] text-[#BBDCE5]' : 'bg-[#BBDCE5] text-white'}
+          `}>
+            {index + 1}
+          </div>
+          
+          <div className="flex-1">
+            <h3 className={`font-bold text-base leading-tight ${isSelected ? 'text-[#d98c4d]' : 'text-gray-900'}`}>
               {module.title}
             </h3>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             {isCompleted && (
               <CheckCircle className="w-4 h-4 text-green-500" />
             )}
             {isBookmarked && (
-              <Bookmark className="w-3.5 h-3.5 text-[#CFAB8D]" />
+              <Bookmark className="w-3.5 h-3.5 text-[#d98c4d]" />
             )}
           </div>
         </div>
@@ -96,7 +97,7 @@ export default function ModuleCard({
         </div>
 
         {/* Content Preview */}
-        <p className={`text-xs leading-snug mb-4 ${isSelected ? 'text-[#CFAB8D]' : 'text-gray-600'}`}>
+        <p className={`text-xs leading-snug mb-4 ${isSelected ? 'text-[#d98c4d]' : 'text-gray-600'}`}>
           {module.content.substring(0, 90)}...
         </p>
 
