@@ -33,7 +33,7 @@ import requests
 import json
 import re
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any,Tuple
 from dotenv import load_dotenv
 
 # --- AI and PDF Processing Imports ---
@@ -49,7 +49,7 @@ load_dotenv()
 # --- Configuration for Groq API ---
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 # Using a fast and capable Llama3 model available on Groq
-GROQ_MODEL_NAME = "llama3-8b-8192"
+GROQ_MODEL_NAME = "llama-3.1-8b-instant"
 # DPI for rendering PDF pages to images for OCR
 OCR_DPI = 300
 # Character limit for text chunks sent to the API.
@@ -67,8 +67,8 @@ class SyllabusProcessor:
             self.api_key = os.getenv("GROQ_API_KEY")
             if not self.api_key:
                  # Fallback for local dev if Colab-specific method fails
-                 from google.colab import userdata
-                 self.api_key = userdata.get("GROQ_API_KEY")
+                 
+                 self.api_key = os.getenv("GROQ_API_KEY")
             print("Loaded GROQ_API_KEY from Colab Secrets.")
         except (ImportError, KeyError):
             self.api_key = os.getenv("GROQ_API_KEY")
@@ -82,7 +82,7 @@ class SyllabusProcessor:
 
     # PART I: ROBUST PDF & TEXT EXTRACTION
 
-      def _extract_text_with_table_detection(self, doc: fitz.Document) -> (str, bool):
+      def _extract_text_with_table_detection(self, doc: fitz.Document) -> Tuple[str, bool]:
           """
           Specialized method for PDFs with clear table structures.
           """
