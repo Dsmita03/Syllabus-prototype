@@ -1,3 +1,6 @@
+# IMPORTANT NOTE:
+# Anymore this file is not needed. The backend logic has been moved to a new structure.
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os

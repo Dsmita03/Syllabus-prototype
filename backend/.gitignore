@@ -19,7 +19,8 @@ venv.bak/
 
 
 /data
-/uploads
+/syllabus_uploads
+/flask_session
 # Distribution / packaging
 .Python
 build/

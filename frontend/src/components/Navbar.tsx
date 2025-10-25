@@ -16,10 +16,10 @@ export default function Navbar() {
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
             <a 
-              href="#home" 
+              href="/gesture-upload" 
               className="text-gray-700 hover:text-[#BBDCE5] transition-colors font-medium"
             >
-              Home
+              Hand Gestures
             </a>
             <a 
               href="#features" 

@@ -2,7 +2,8 @@ import FileUpload from '@/components/FileUpload';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Image from 'next/image';
-import { Zap, Target,Upload, CheckCircle, Users, BookOpen, Brain} from 'lucide-react';
+import Link from 'next/link';
+import { Hand,Zap, Target,Upload, CheckCircle, Users, BookOpen, Brain} from 'lucide-react';
 
 export default function Home() {
   return (
@@ -188,6 +189,14 @@ export default function Home() {
    </section>
         </div>
       </main>
+      <Link
+        href="/gesture-upload"
+        className="fixed bottom-8 right-8 z-50 bg-[#8fbbc7] text-white p-4 rounded-full shadow-xl hover:bg-[#a9c9d3] hover:scale-110 transition-all duration-300 ease-in-out"
+        aria-label="Upload with Hand Gestures"
+        title="Upload with Hand Gestures"
+      >
+        <Hand className="w-6 h-6" />
+      </Link>
       <Footer />
     </div>
   );
