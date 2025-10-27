@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
@@ -5,14 +7,19 @@ export default function Navbar() {
         <nav className="flex items-center justify-between">
           {/* Logo Section */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-[#BBDCE5] rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-xl font-bold text-gray-800">E</span>
-            </div>
-            <span className="text-lg font-semibold text-gray-800 tracking-wide">
-              EduModule
-            </span>
-          </div>
-
+          <div className="w-10 h-10 rounded-lg overflow-hidden shadow-md">
+           <Image 
+            src="/logo.png" 
+            alt="EduModule Logo" 
+            width={40} 
+            height={40}
+            className="object-contain"
+            />
+           </div>
+          <span className="text-lg font-semibold text-gray-800 tracking-wide">
+           EduModule
+           </span>
+           </div>
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-8">
             <a 

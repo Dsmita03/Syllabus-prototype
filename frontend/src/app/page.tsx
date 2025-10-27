@@ -89,19 +89,19 @@ export default function Home() {
                   imageAlt: 'Module Division'
                 },
                 {
+                  icon: CheckCircle,
+                  title: 'Course Outcome',
+                  description: 'Track and achieve comprehensive course outcomes with structured learning paths and measurable progress indicators.',
+                  color: 'bg-[#CFAB8D]',
+                  imageAlt: 'Course Outcomes'
+               },
+               {
                   icon: Target,
                   title: 'Multi-Level Questions',
                   description: 'Generate questions at easy, medium, and hard difficulty levels including multiple choice and essays.',
                   color: 'bg-[#D9C4B0]',
                   imageAlt: 'Question Generation'
                 },
-                {
-                  icon: Zap,
-                  title: 'Instant Processing',
-                  description: 'Lightning-fast AI analysis that processes your documents in seconds with comprehensive results.',
-                  color: 'bg-[#CFAB8D]',
-                  imageAlt: 'Fast Processing'
-                }
               ].map((feature, index) => (
                 <div key={index} className="group bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-white/60 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                   {/* Feature Image */}

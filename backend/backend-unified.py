@@ -1,4 +1,3 @@
-
 # This Flask application combines:
 # 1. Gesture-based file browsing and upload (one-step processing)
 # 2. Manual, two-step file upload and processing for the Next.js frontend
@@ -106,8 +105,15 @@ def find_uploaded_file_by_id(prefix_id: str) -> str | None:
             return os.path.join(folder, fname)
     return None
 
+# ==================================================================
+# BEGIN FIXED CODE BLOCK
+# ==================================================================
+
 def detect_gesture(img: np.ndarray) -> str:
-    """Detect hand gestures using MediaPipe"""
+    """
+    Detect hand gestures using MediaPipe with more robust logic.
+    Checks for curled vs. straight fingers.
+    """
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(img_rgb)
     
@@ -116,24 +122,76 @@ def detect_gesture(img: np.ndarray) -> str:
     
     for hand_landmarks in results.multi_hand_landmarks:
         landmarks = hand_landmarks.landmark
-        thumb_tip, index_tip = landmarks[4], landmarks[8]
-        middle_tip, ring_tip, pinky_tip = landmarks[12], landmarks[16], landmarks[20]
         
-        h, w, _ = img.shape
-        thumb_y, index_y = int(thumb_tip.y * h), int(index_tip.y * h)
-        middle_y, ring_y, pinky_y = int(middle_tip.y * h), int(ring_tip.y * h), int(pinky_tip.y * h)
-        thumb_x, index_x = int(thumb_tip.x * w), int(index_tip.x * w)
+        # --- Get all relevant landmarks ---
+        try:
+            # Tips
+            thumb_tip = landmarks[mp_hands.HandLandmark.THUMB_TIP]       # 4
+            index_tip = landmarks[mp_hands.HandLandmark.INDEX_FINGER_TIP] # 8
+            middle_tip = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]# 12
+            ring_tip = landmarks[mp_hands.HandLandmark.RING_FINGER_TIP]   # 16
+            pinky_tip = landmarks[mp_hands.HandLandmark.PINKY_TIP]      # 20
+            
+            # PIPs (middle joints)
+            index_pip = landmarks[mp_hands.HandLandmark.INDEX_FINGER_PIP] # 6
+            middle_pip = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_PIP]# 10
+            ring_pip = landmarks[mp_hands.HandLandmark.RING_FINGER_PIP]   # 14
+            pinky_pip = landmarks[mp_hands.HandLandmark.PINKY_PIP]      # 18
+            
+            # MCPs (base knuckles)
+            thumb_mcp = landmarks[mp_hands.HandLandmark.THUMB_MCP]        # 2
+            index_mcp = landmarks[mp_hands.HandLandmark.INDEX_FINGER_MCP] # 5
+            
+        except IndexError:
+            # This can happen if landmarks are not fully detected
+            return 'unknown'
+
+        # --- Calculate finger states ---
+        # A finger is "straight" if its tip is higher (smaller Y) than its middle joint.
+        index_straight = index_tip.y < index_pip.y
         
-        if (thumb_y < index_y and thumb_y < middle_y and 
-            thumb_y < ring_y and thumb_y < pinky_y):
-            return 'thumbs_up'
-        if (thumb_y > index_y and thumb_y > middle_y and 
-            thumb_y > ring_y and thumb_y > pinky_y):
-            return 'thumbs_down'
-        if (index_y < middle_y and index_y < ring_y and 
-            index_y < pinky_y and abs(index_x - thumb_x) > 50):
+        # A finger is "curled" if its tip is lower (larger Y) than its middle joint.
+        index_curled = index_tip.y > index_pip.y
+        middle_curled = middle_tip.y > middle_pip.y
+        ring_curled = ring_tip.y > ring_pip.y
+        pinky_curled = pinky_tip.y > pinky_pip.y
+
+        # --- Gesture Logic (Prioritized with if/elif) ---
+        
+        # 1. Check for POINT
+        # Condition: Index is straight, all others are curled.
+        # Thumb is also tucked in (tip lower than index pip).
+        if (index_straight and 
+            middle_curled and 
+            ring_curled and 
+            pinky_curled and
+            thumb_tip.y > index_pip.y): # Thumb tucked
             return 'point'
+        
+        # 2. Check for THUMBS UP
+        # Condition: Thumb is "up" (tip higher than index base), other fingers are curled.
+        if (thumb_tip.y < index_mcp.y and
+            index_curled and
+            middle_curled and
+            ring_curled and
+            pinky_curled):
+            return 'thumbs_up'
+            
+        # 3. Check for THUMBS DOWN
+        # Condition: Thumb is "down" (tip lower than its own base), other fingers are curled.
+        if (thumb_tip.y > thumb_mcp.y and # Thumb points down relative to its base
+            index_curled and
+            middle_curled and
+            ring_curled and
+            pinky_curled):
+            return 'thumbs_down'
+
+    # Default case if no specific gesture is matched
     return 'unknown'
+
+# ==================================================================
+# END FIXED CODE BLOCK
+# ==================================================================
 
 def speak_without_saving(text: str):
     """Placeholder for text-to-speech"""

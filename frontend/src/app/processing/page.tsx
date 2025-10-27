@@ -43,27 +43,42 @@ export default function ProcessingPage() {
 
     const processFile = async () => {
       try {
-        // Process through steps
-        for (let i = 0; i < processingSteps.length; i++) {
-          const step = processingSteps[i];
-          setCurrentStep(i);
-          await new Promise(resolve => setTimeout(resolve, step.delay));
-          setProgress(step.progress);
-          setStatus(step.status);
-          setCompletedSteps(prev => [...prev, i]);
-        }
-
-        // Call backend API
-        const response = await fetch('http://localhost:5001/api/process', {
+        // 1. Start the REAL API call immediately and store the promise.
+        const processPromise = fetch('http://localhost:5001/api/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file_id: fileId }),
         });
 
+        // 2. Start the FAKE UI animation loop concurrently.
+        const animationPromise = (async () => {
+          for (let i = 0; i < processingSteps.length; i++) {
+            const step = processingSteps[i];
+            setCurrentStep(i);
+            setProgress(step.progress);
+            setStatus(step.status);
+            setCompletedSteps(prev => [...prev, i]);
+            // Wait for the step's fake delay
+            await new Promise(resolve => setTimeout(resolve, step.delay));
+          }
+        })();
+
+        // 3. Wait for BOTH the real API call AND the animations to finish.
+        //    This ensures the animations run, but the page won't proceed
+        //    until the backend is actually done.
+        const [response] = await Promise.all([processPromise, animationPromise]);
+        
+        // --- END REAL IMPLEMENTATION ---
+
         const result = await response.json();
         
         if (result.success) {
+          // Ensure UI is fully complete before redirecting
           setStatus('Complete! Redirecting...');
+          setProgress(100);
+          setCurrentStep(processingSteps.length - 1);
+          setCompletedSteps(processingSteps.map((_, i) => i));
+
           await new Promise(resolve => setTimeout(resolve, 1000));
           router.push(`/results?sessionId=${result.session_id}`);
         } else {
@@ -102,7 +117,7 @@ export default function ProcessingPage() {
 
   const currentStepData = processingSteps[currentStep] || processingSteps[processingSteps.length - 1];
   const StepIcon = currentStepData?.icon || FileText;
-  const isComplete = progress === 100;
+  const isComplete = progress === 100 && status.startsWith('Complete');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#ECEEDF] via-white to-[#BBDCE5]/30 flex items-center justify-center p-6">
@@ -156,7 +171,7 @@ export default function ProcessingPage() {
               )}
             </div>
             <div className="mt-4">
-              <p className="text-lg font-semibold text-gray-900">{progress}%</p>
+              <p className="text-lg font-semibold text-gray-900">{isComplete ? 100 : progress}%</p>
               <p className="text-[#BBDCE5] font-medium">{status}</p>
             </div>
           </div>
@@ -166,7 +181,7 @@ export default function ProcessingPage() {
             {processingSteps.map((step, index) => {
               const StepIcon = step.icon;
               const isCompleted = completedSteps.includes(index);
-              const isCurrent = currentStep === index;
+              const isCurrent = currentStep === index && !isComplete;
               
               return (
                 <div 

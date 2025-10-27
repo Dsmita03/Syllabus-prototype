@@ -1,33 +1,3 @@
-# ==============================================================================
-# AI-Powered Syllabus Processor (Using Groq Cloud API) - v2 (Robust Version)
-# ==============================================================================
-# This script uses an advanced "master prompt" with multiple examples to handle
-# a wide variety of unstructured syllabus formats.
-#
-# v2 Changes:
-# - Added a pre-processing step to clean and trim text before sending to the AI.
-# - Implemented text chunking to handle very long syllabi and prevent the
-#   "413 Payload Too Large" API error.
-# - Added a retry mechanism with exponential backoff to handle "429 Too Many
-#   Requests" rate-limiting errors.
-# - Made the main processing pipeline more robust and resilient.
-#
-# Setup Instructions:
-# 1.  Go to https://console.groq.com/keys and sign up for a free account.
-# 2.  Create a new API key and copy it.
-# 3.  In Google Colab, use the "Secrets" tab (key icon) to add a new secret:
-#     Name: GROQ_API_KEY
-#     Value: your_key_here
-#
-# Required Installations:
-# -----------------------
-# pip install PyMuPDF pdf2image pytesseract opencv-python requests python-dotenv
-#
-# System Dependencies (for Colab/Linux):
-# -------------------------------------
-# sudo apt-get install tesseract-ocr poppler-utils
-# ==============================================================================
-
 import os
 import requests
 import json
