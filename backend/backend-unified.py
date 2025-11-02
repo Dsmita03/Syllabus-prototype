@@ -22,7 +22,7 @@ from werkzeug.utils import secure_filename
 import mediapipe as mp
 import logging
 from processor import SyllabusProcessor
-
+from analyser import generate_course_outcomes_from_modules
  
 
 app = Flask(__name__)
