@@ -22,7 +22,8 @@ from werkzeug.utils import secure_filename
 import mediapipe as mp
 import logging
 from processor import SyllabusProcessor
-from analyser import generate_course_outcomes_from_modules
+# from analyser import generate_course_outcomes_from_modules
+import analyser
  
 
 app = Flask(__name__)
@@ -519,6 +520,54 @@ app.register_blueprint(gesture_bp)
 app.register_blueprint(upload_bp) 
 # HEALTH CHECK & ROOT ROUTES
  
+@app.route('/api/generate_outcomes', methods=['GET', 'OPTIONS'])
+@cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
+def generate_outcomes():
+    """
+    Generate course outcomes from processed modules.
+    Query param: session_id (string)
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'OK'}), 200
+
+    session_id = request.args.get('session_id')
+    if not session_id:
+        return jsonify({'success': False, 'error': 'No session_id provided'}), 400
+
+    safe_id = secure_filename(session_id)
+    result_path = os.path.join(DATA_FOLDER, f"{safe_id}.json")
+    if not os.path.exists(result_path):
+        return jsonify({'success': False, 'error': 'Results not found for provided session_id'}), 404
+
+    try:
+        with open(result_path, 'r', encoding='utf-8') as f:
+            results = json.load(f)
+        modules = results.get('modules', [])
+        if not modules:
+            return jsonify({'success': False, 'error': 'No modules available in results'}), 400
+
+        # analyser.generate_course_outcomes_from_modules is expected to return a JSON-serializable structure
+        # outcomes = generate_course_outcomes_from_modules(modules)
+        outcomes = analyser.generate_course_outcomes_from_modules(modules)
+
+        logger.info(f"Generated outcomes for session {session_id}")
+        # return jsonify({
+        #     'success': True,
+        #     'session_id': session_id,
+        #     'outcomes': outcomes
+        # }), 200
+        return jsonify({
+                'success': True,
+                'session_id': session_id,
+                'models_loaded': getattr(analyser, "MODELS_LOADED", False),
+                'outcomes': outcomes,
+                'course_outcomes': outcomes 
+            }), 200
+    except Exception as e:
+        logger.exception("Error generating outcomes")
+        return jsonify({'success': False, 'error': f'Failed to generate outcomes: {str(e)}'}), 500
+
+
 @app.route('/')
 def index():
     return jsonify({
@@ -557,7 +606,7 @@ def internal_server_error(error):
         'success': False,
         'error': 'Internal server error'
     }), 500
-    
+
 # MAIN ENTRY POINT
  
 if __name__ == '__main__':

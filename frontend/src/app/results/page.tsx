@@ -378,7 +378,7 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
-                {/* Module Content */}
+                {/* Module Content
                 <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30">
                   <div className="flex items-center space-x-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
                     <div className="w-10 h-10 bg-[#BBDCE5] rounded-lg flex items-center justify-center">
@@ -392,6 +392,49 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
+              </div> */}
+              {/* Course Outcomes Section */}
+{(isGeneratingOutcomes || courseOutcomes.length > 0 || outcomeError) && (
+  <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 mt-6">
+    <div className="flex items-center space-x-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
+      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+        <Award className="w-5 h-5 text-white" />
+      </div>
+      <h4 className="text-xl font-bold text-gray-900">AI-Generated Course Outcomes</h4>
+    </div>
+
+    <div className="p-6">
+      {isGeneratingOutcomes && (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mr-3" />
+          <span className="text-gray-700 text-lg font-medium">Generating outcomes...</span>
+        </div>
+      )}
+
+      {outcomeError && (
+        <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200">
+          ⚠️ {outcomeError}
+        </div>
+      )}
+
+      {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
+        <ul className="space-y-4">
+          {courseOutcomes.map((outcome, idx) => (
+            <li
+              key={idx}
+              className="flex items-start space-x-3 bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 p-4 rounded-xl border border-[#BBDCE5]/30 shadow-sm"
+            >
+              <span className="w-6 h-6 flex items-center justify-center bg-[#BBDCE5] text-white font-semibold rounded-full">
+                {idx + 1}
+              </span>
+              <p className="text-gray-800 leading-relaxed">{outcome}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+)}
               </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 p-16 text-center">
