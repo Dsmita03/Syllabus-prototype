@@ -47,6 +47,9 @@ export default function GestureUploadPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastGestureRef = useRef<string>('none');
+  const lastStateRef = useRef<string>('IDLE');
+  const lastUploadAnnouncedRef = useRef<boolean>(false);
 
   // State management
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -89,7 +92,7 @@ export default function GestureUploadPage() {
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
-  };
+  }; 
 
   // Capture frame and send to backend
   const captureAndSendFrame = useCallback(async () => {
@@ -166,6 +169,21 @@ export default function GestureUploadPage() {
       console.error('Reset error:', err);
     }
   };
+
+  const speak = (text: string) => {
+  if (typeof window === 'undefined') return; // safety for Next.js
+  if (!('speechSynthesis' in window)) return;
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-IN';         // or 'en-US', etc.
+  utterance.rate = 1;               // normal speed
+  utterance.pitch = 1;
+
+  // Optional: cancel previous speech so it doesn’t overlap
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+};
+
 
   // Print upload results
   const handlePrint = () => {
@@ -282,6 +300,49 @@ export default function GestureUploadPage() {
       stopCamera();
     };
   }, []);
+
+  useEffect(() => {
+  const { gesture, state, status } = gestureData;
+
+  // 1) Announce gesture when it changes and is meaningful
+  if (gesture !== lastGestureRef.current) {
+    lastGestureRef.current = gesture;
+
+    if (gesture !== 'none' && gesture !== 'unknown') {
+      const meaning = getGestureMeaning(gesture, state);
+
+      if (meaning) {
+        // Example: "Open palm detected. Start browsing"
+        speak(`${meaning}`);
+      } else {
+        speak(`Gesture ${gesture.replace('_', ' ')} detected`);
+      }
+    }
+  }
+
+  // 2) Announce important state changes
+  if (state !== lastStateRef.current) {
+    const prevState = lastStateRef.current;
+    lastStateRef.current = state;
+
+    if (state === 'BROWSING' && prevState === 'IDLE') {
+      speak('Started browsing files. Use open palm for next file and fist for previous file.');
+    } else if (state === 'CONFIRMING') {
+      speak('File selected. Show thumbs up to confirm or thumbs down to cancel.');
+    } else if (state === 'NO_FILES') {
+      speak('No files found in the folder.');
+    } else if (state === 'ERROR') {
+      speak('An error occurred. Please try again.');
+    }
+  }
+
+  // 3) Announce upload success once
+  if (uploadResult && !lastUploadAnnouncedRef.current) {
+    lastUploadAnnouncedRef.current = true;
+    speak('File uploaded and processed successfully.');
+  }
+
+}, [gestureData, uploadResult]);
 
   // Get state color
   const getStateColor = (state: string) => {
@@ -452,25 +513,6 @@ export default function GestureUploadPage() {
                     <span className="font-bold text-[#6b8288] text-lg">{gestureData.state}</span>
                   </div>
                 </div>
-{/* 
-                <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
-                  <div className="text-sm text-gray-600 mb-2 font-medium">
-                    Detected Gesture
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl">{getGestureEmoji(gestureData.gesture)}</span>
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-[#6b8288] text-lg capitalize">
-                        {gestureData.gesture.replace('_', ' ')}
-                      </span>
-                      {gestureData.raw_gesture && gestureData.raw_gesture !== gestureData.gesture && (
-                        <span className="text-xs text-gray-500">
-                          Raw: {gestureData.raw_gesture.replace('_', ' ')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div> */}
                <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
                <div className="text-sm text-gray-600 mb-2 font-medium">
                  Detected Gesture
@@ -493,8 +535,6 @@ export default function GestureUploadPage() {
                </div>
               </div>
             </div>
-
-
                 <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
                   <div className="text-sm text-gray-600 mb-2 font-medium">Status</div>
                   <div className="text-[#6b8288] font-medium">{gestureData.status}</div>
@@ -645,7 +685,7 @@ export default function GestureUploadPage() {
               </div>
             </div>
             <div className="flex items-start gap-4 p-5 bg-[#ECEEDF] rounded-xl border border-[#D9C4B0]/30">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+              <div className="w-12 h-12 bg-gradient-to-br from-[#5da8bd] to-[#71a9b8] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
                 <span className="text-2xl">👍</span>
               </div>
               <div>
