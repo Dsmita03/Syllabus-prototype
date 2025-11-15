@@ -2,7 +2,7 @@
  
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState,useCallback } from 'react';
 import { Camera, FileText, CheckCircle, XCircle, Loader2, Hand, RotateCw, Printer } from 'lucide-react';
 
 const API_BASE_URL = 'http://localhost:5001';
@@ -92,8 +92,14 @@ export default function GestureUploadPage() {
   };
 
   // Capture frame and send to backend
-  const captureAndSendFrame = async () => {
+  const captureAndSendFrame = useCallback(async () => {
+    // Check 1: Don't run if camera is off or refs are missing
     if (!videoRef.current || !canvasRef.current || !isCameraActive) return;
+
+    // --- FIX: Don't start a new request if one is already running ---
+    if (isProcessing) {
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -110,7 +116,7 @@ export default function GestureUploadPage() {
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
 
     try {
-      setIsProcessing(true);
+      setIsProcessing(true); // Start processing
 
       const response = await fetch(`${API_BASE_URL}/api/gesture/detect`, {
         method: 'POST',
@@ -138,10 +144,10 @@ export default function GestureUploadPage() {
       console.error('Gesture detection error:', err);
       setError('Failed to detect gesture. Check if backend is running on port 5001.');
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(false); // Always set to false when done
     }
-  };
-
+    // Add all state/props dependencies
+  }, [isCameraActive, isProcessing]);
   // Reset gesture session
   const resetSession = async () => {
     try {
@@ -258,7 +264,7 @@ export default function GestureUploadPage() {
     }, 250);
   };
 
-  // Continuous frame capture
+// Continuous frame capture
   useEffect(() => {
     if (!isCameraActive) return;
 
@@ -267,8 +273,8 @@ export default function GestureUploadPage() {
     }, 500); // Send frame every 500ms
 
     return () => clearInterval(intervalId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCameraActive]);
+  
+  }, [isCameraActive, captureAndSendFrame]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -305,7 +311,7 @@ export default function GestureUploadPage() {
       case 'thumbs_down':
         return '👎';
       case 'point':
-        return '👉';
+        return '☝️';
       case 'open_palm':
         return '✋';
       case 'fist':
@@ -397,8 +403,6 @@ export default function GestureUploadPage() {
                 </div>
               )}
             </div>
-
-            {/* Gesture Instructions - Updated to match backend */}
             <div className="mt-6 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gradient-to-br from-[#BBDCE5] to-[#a5cfd8] p-4 rounded-xl text-center shadow-md border border-[#91bcc6]/30">
@@ -414,16 +418,16 @@ export default function GestureUploadPage() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-gradient-to-br from-[#91bcc6] to-[#BBDCE5] p-4 rounded-xl text-center shadow-md border border-[#71a9b8]/30">
-                  <div className="text-3xl mb-2">👉</div>
+                  <div className="text-3xl mb-2">☝️</div>
                   <div className="font-semibold text-white text-sm">Point</div>
                   <div className="text-white/80 text-xs mt-1">Select</div>
                 </div>
-                <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-center shadow-md">
-                  <div className="text-3xl mb-2">👍</div>
+                <div className="bg-gradient-to-br  from-[#39727f] to-[#4b899a] p-4 rounded-xl text-center shadow-md  border-[#71a9b8]/30">
+                  <div className="text-3xl mb-2">👍</div> 
                   <div className="font-semibold text-white text-sm">Thumbs Up</div>
                   <div className="text-white/80 text-xs mt-1">Confirm</div>
                 </div>
-                <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl text-center shadow-md">
+                <div className="bg-gradient-to-br from-[#5da8bd] to-[#71a9b8] p-4 rounded-xl text-center shadow-md  border-[#5da8bd]/30">
                   <div className="text-3xl mb-2">👎</div>
                   <div className="font-semibold text-white text-sm">Thumbs Down</div>
                   <div className="text-white/80 text-xs mt-1">Cancel</div>
@@ -631,7 +635,7 @@ export default function GestureUploadPage() {
             </div>
             <div className="flex items-start gap-4 p-5 bg-[#ECEEDF] rounded-xl border border-[#D9C4B0]/30">
               <div className="w-12 h-12 bg-gradient-to-br from-[#91bcc6] to-[#BBDCE5] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-                <span className="text-2xl">👉</span>
+                <span className="text-2xl">☝️</span>
               </div>
               <div>
                 <div className="font-semibold text-[#6b8288] mb-1">Select File</div>
@@ -674,7 +678,7 @@ export default function GestureUploadPage() {
                 <span className="text-2xl">🎯</span>
                 <div>
                   <div className="font-semibold mb-1">Steady Gestures</div>
-                  <div className="text-sm text-white/90">Hold gestures for 0.35s to trigger</div>
+                  <div className="text-sm text-white/90">Hold gestures for 0.6s to trigger</div>
                 </div>
               </div>
             </div>

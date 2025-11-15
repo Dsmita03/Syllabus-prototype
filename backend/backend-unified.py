@@ -107,19 +107,23 @@ def find_uploaded_file_by_id(prefix_id: str) -> str | None:
 # BEGIN FIXED CODE BLOCK (updated gesture detection)
  
 
+# BEGIN UPDATED CODE BLOCK
+
+# BEGIN FINAL GESTURE LOGIC
+
 def detect_gesture(img: np.ndarray) -> str:
     """
     Detect hand gestures using MediaPipe with clearer separation between:
       - open_palm  -> start/next
-      - fist       -> previous
-      - point      -> select
-      - thumbs_up  -> confirm
-      - thumbs_down-> cancel
+      - fist         -> previous
+      - point        -> select
+      - thumbs_up    -> confirm
+      - thumbs_down  -> cancel
 
     Updated to:
-      - Prioritize POINT over FIST
-      - Make FIST stricter (index must not look extended)
-      - Make POINT slightly more forgiving on index extension
+      - PRIORITIZE "closed hand" check (fist, thumbs up/down)
+      - This correctly identifies a 'thumbs_up' even if other
+        fingers are bent, not perfectly curled.
     """
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(img_rgb)
@@ -161,9 +165,7 @@ def detect_gesture(img: np.ndarray) -> str:
             return 'unknown'
 
         # ---- Helpers ----
-        # Slightly relaxed extended check for index, stricter curled check for fist
         EXT_MARGIN = 0.035
-        CURL_MARGIN = 0.025
 
         def is_extended(tip, pip, mcp, margin: float = EXT_MARGIN) -> bool:
             """
@@ -171,22 +173,11 @@ def detect_gesture(img: np.ndarray) -> str:
             """
             return (tip.y < pip.y - margin) and (pip.y < mcp.y - margin / 2)
 
-        def is_curled(tip, pip, mcp, margin: float = CURL_MARGIN) -> bool:
-            """
-            Finger curled if tip is clearly below pip (toward palm).
-            """
-            return tip.y > pip.y + margin
-
-        # Finger states
+        # Finger states (Extended or Not)
         index_extended = is_extended(index_tip, index_pip, index_mcp)
         middle_extended = is_extended(middle_tip, middle_pip, middle_mcp)
         ring_extended = is_extended(ring_tip, ring_pip, ring_mcp)
         pinky_extended = is_extended(pinky_tip, pinky_pip, pinky_mcp)
-
-        index_curled = is_curled(index_tip, index_pip, index_mcp)
-        middle_curled = is_curled(middle_tip, middle_pip, middle_mcp)
-        ring_curled = is_curled(ring_tip, ring_pip, ring_mcp)
-        pinky_curled = is_curled(pinky_tip, pinky_pip, pinky_mcp)
 
         # Thumb orientation: vertical vs horizontal
         thumb_vertical = abs(thumb_tip.y - thumb_mcp.y) > 1.2 * abs(thumb_tip.x - thumb_mcp.x)
@@ -196,46 +187,48 @@ def detect_gesture(img: np.ndarray) -> str:
         # Finger spread (for open palm)
         finger_spread = abs(index_tip.x - pinky_tip.x)
 
-        # --- Gesture Logic (order matters!) ---
-        # 1) THUMBS UP: thumb vertical & up, others curled
-        if thumb_up and index_curled and middle_curled and ring_curled and pinky_curled:
-            return 'thumbs_up'
+        # --- NEW GESTURE LOGIC (Solves thumbs_up vs fist) ---
 
-        # 2) THUMBS DOWN: thumb vertical & down, others curled
-        if thumb_down and index_curled and middle_curled and ring_curled and pinky_curled:
-            return 'thumbs_down'
-
-        # 3) POINT: index clearly extended, others not extended, thumb not vertical
-        #    -> PRIORITIZED BEFORE FIST NOW
-        if (
-            index_extended and
-            not (middle_extended or ring_extended or pinky_extended) and  # only index extended
-            (middle_curled or ring_curled or pinky_curled) and            # at least one curled
-            not thumb_vertical
-        ):
-            return 'point'
-
-        # 4) FIST: all fingers clearly curled, and index definitely not extended
-        if (
-            index_curled and middle_curled and ring_curled and pinky_curled and
-            not index_extended
-        ):
-            return 'fist'
-
-        # 5) OPEN PALM: all four fingers extended AND spread out
+        # 1) OPEN PALM: (Strict) all four fingers extended AND spread out
         if (
             index_extended and middle_extended and ring_extended and pinky_extended and
             finger_spread > 0.15
         ):
             return 'open_palm'
 
+        # 2) POINT: (Robust) only index extended, others NOT extended.
+        if (
+            index_extended and
+            not middle_extended and
+            not ring_extended and
+            not pinky_extended
+        ):
+            # Check thumb isn't vertical to avoid confusion
+            if not thumb_vertical:
+                 return 'point'
+
+        # 3) CLOSED HAND CHECK (Fist, Thumbs Up, Thumbs Down)
+        # This is the main fix. We check for a closed hand FIRST.
+        if (
+            not index_extended and
+            not middle_extended and
+            not ring_extended and
+            not pinky_extended
+        ):
+            # Hand is closed. NOW, check the thumb.
+            if thumb_up:
+                return 'thumbs_up'  # <-- Solves your "bent finger" problem
+            
+            if thumb_down:
+                return 'thumbs_down'
+            
+            # If thumb is not up or down, it's a fist
+            return 'fist'
+
     # No confident match
     return 'unknown'
 
- 
-# END FIXED CODE BLOCK
- 
-
+# END FINAL GESTURE LOGIC
 
 def speak_without_saving(text: str):
     """Placeholder for text-to-speech"""
@@ -247,18 +240,48 @@ def process_file_with_ai(file_path: str) -> Dict[str, Any]:
     """
     Helper for GESTURE upload (one-step)
     Process uploaded file using the SyllabusProcessor
-    Returns: processing results with extracted modules
+    
+    UPDATED: Now uses the global processor and PROCESSING_FILES lock
+    to ensure thread-safety and consistency with /api/process.
     """
-    try:
-        # Note: We re-initialize the processor here for thread-safety
-        # if this causes issues, initialize it once globally
-        gesture_processor = SyllabusProcessor()
-        result = gesture_processor.process_syllabus(file_path)
-        return result
-    except Exception as e:
-        print(f"Error in process_file_with_ai: {e}")
-        return {'success': False, 'error': str(e), 'modules': []}
+    # Use the file_path itself as a unique ID for the lock
+    file_id_lock = os.path.basename(file_path) 
+    
+    if file_id_lock in PROCESSING_FILES:
+        logger.warning(f"Gesture upload: File is already being processed: {file_id_lock}")
+        return {
+            'success': False, 
+            'error': 'This file is already being processed.', 
+            'modules': []
+        }
 
+    try:
+        PROCESSING_FILES.add(file_id_lock)
+        logger.info(f"Gesture upload: Processing file: {file_path}")
+
+        # Use the global processor instance, just like /api/process
+        result = processor.process_syllabus(file_path) 
+
+        if not result.get('success'):
+            return {
+                'success': False, 
+                'error': result.get('error', 'Processing failed'), 
+                'modules': []
+            }
+
+        # The gesture flow doesn't need to save to a session_id.json,
+        # it returns the result directly.
+        logger.info(f"Gesture upload: Processing completed for {file_id_lock}")
+        return result
+
+    except Exception as e:
+        logger.exception(f"Error in process_file_with_ai: {e}")
+        return {'success': False, 'error': str(e), 'modules': []}
+    
+    finally:
+        # IMPORTANT: Always remove the file from the set
+        if file_id_lock in PROCESSING_FILES:
+            PROCESSING_FILES.remove(file_id_lock)
 # GESTURE-BASED UPLOAD ROUTES
 
 gesture_bp = Blueprint('gesture', __name__, url_prefix='/api/gesture')
@@ -284,7 +307,7 @@ def detect_image():
             session['last_raw_gesture'] = 'none'
             session['gesture_start_time'] = 0.0
 
-        DEBOUNCE_INTERVAL = 2.0
+        DEBOUNCE_INTERVAL = 2.5
         SPEAK_INTERVAL = 3.0
 
         data = request.get_json()
@@ -311,8 +334,8 @@ def detect_image():
             raw_gesture = 'none'
 
         # ---- Gesture stability filter (to avoid quick mis-detections) ----
-        STABLE_GESTURE_TIME = 0.35  # seconds the same gesture must be seen
-
+        STABLE_GESTURE_TIME = 0.6  # seconds the same gesture must be seen
+ 
         last_raw = session.get('last_raw_gesture', 'none')
         gesture_start_time = session.get('gesture_start_time', current_time)
 
