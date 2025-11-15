@@ -33,6 +33,19 @@ interface Module {
   }>;
 }
 
+interface Outcome {
+  keyword: string;
+  bloom_level: string;
+  outcome: string;
+}
+
+interface ModuleOutcome {
+  module_id: number;
+  title: string;
+  keywords: string[];
+  outcomes: Outcome[];
+}
+
 export default function ResultsPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [selectedModule, setSelectedModule] = useState<string>('');
@@ -42,7 +55,9 @@ export default function ResultsPage() {
   const [bookmarkedModules, setBookmarkedModules] = useState<Set<string>>(new Set());
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [courseOutcomes, setCourseOutcomes] = useState<string[]>([]);
+  // const [courseOutcomes, setCourseOutcomes] = useState<string[]>([]);
+  const [courseOutcomes, setCourseOutcomes] = useState<ModuleOutcome[]>([]);
+
   const [isGeneratingOutcomes, setIsGeneratingOutcomes] = useState(false);
   const [outcomeError, setOutcomeError] = useState<string>('');
 
@@ -417,7 +432,7 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
+      {/* {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
         <ul className="space-y-4">
           {courseOutcomes.map((outcome, idx) => (
             <li
@@ -431,7 +446,42 @@ export default function ResultsPage() {
             </li>
           ))}
         </ul>
-      )}
+      )} */}
+      {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
+  <div className="space-y-8">
+    {courseOutcomes.map((module, moduleIndex) => (
+      <div key={moduleIndex} className="bg-white p-6 rounded-xl shadow border border-[#D9C4B0]/40">
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">
+          Module {module.module_id}: {module.title}
+        </h3>
+
+        <div className="mb-4">
+          <h4 className="font-semibold text-gray-700">Keywords:</h4>
+          <p className="text-gray-600">{module.keywords.join(', ')}</p>
+        </div>
+
+        <h4 className="font-semibold text-gray-700 mb-2">Course Outcomes:</h4>
+
+        <ul className="space-y-3">
+          {module.outcomes.map((oc, idx) => (
+            <li
+              key={idx}
+              className="flex items-start space-x-3 bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 p-4 rounded-xl border border-[#BBDCE5]/30 shadow-sm"
+            >
+              <span className="w-6 h-6 flex items-center justify-center bg-[#BBDCE5] text-white font-semibold rounded-full">
+                {idx + 1}
+              </span>
+              <p className="text-gray-800 leading-relaxed">
+                <strong>[{oc.bloom_level}]</strong> {oc.outcome}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+)}
+
     </div>
   </div>
 )}

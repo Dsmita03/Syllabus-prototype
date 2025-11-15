@@ -518,8 +518,8 @@ def get_results():
 # REGISTER BLUEPRINTS
 app.register_blueprint(gesture_bp)
 app.register_blueprint(upload_bp) 
-# HEALTH CHECK & ROOT ROUTES
- 
+
+# OutComes generation route
 @app.route('/api/generate_outcomes', methods=['GET', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
 def generate_outcomes():
@@ -548,7 +548,10 @@ def generate_outcomes():
 
         # analyser.generate_course_outcomes_from_modules is expected to return a JSON-serializable structure
         # outcomes = generate_course_outcomes_from_modules(modules)
-        outcomes = analyser.generate_course_outcomes_from_modules(modules)
+        # outcomes = analyser.generate_course_outcomes_from_modules(modules)
+        outcomes = analyser.generate_outcomes_per_module(modules)
+           # Print formatted results in terminal
+        analyser.print_generated_outcomes(outcomes)
 
         logger.info(f"Generated outcomes for session {session_id}")
         # return jsonify({
@@ -567,7 +570,7 @@ def generate_outcomes():
         logger.exception("Error generating outcomes")
         return jsonify({'success': False, 'error': f'Failed to generate outcomes: {str(e)}'}), 500
 
-
+# HEALTH CHECK & ROOT ROUTES
 @app.route('/')
 def index():
     return jsonify({
