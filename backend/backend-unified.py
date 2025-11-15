@@ -4,10 +4,9 @@
 #    - POST /api/upload -> Returns file_id
 #    - POST /api/process -> Starts processing, returns session_id
 #    - GET /api/results -> Returns modules
- 
 
 import os
-import cv2
+import cv2  
 import base64
 import json
 import numpy as np
@@ -22,9 +21,7 @@ from werkzeug.utils import secure_filename
 import mediapipe as mp
 import logging
 from processor import SyllabusProcessor
-# from analyser import generate_course_outcomes_from_modules
 import analyser
- 
 
 app = Flask(__name__)
 
@@ -35,25 +32,23 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_SECURE'] = True  
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
 # File Upload Configuration
- 
+
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'syllabus_uploads')
 GESTURE_SOURCE_FOLDER = os.path.join(BASE_DIR, 'gesture_source_files')
-DATA_FOLDER = os.path.join(BASE_DIR, 'data') # For processed JSON results
+DATA_FOLDER = os.path.join(BASE_DIR, 'data')  # For processed JSON results
 
- 
 ALLOWED_EXTENSIONS = {'pdf', 'txt'}
- 
+
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
- 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(GESTURE_SOURCE_FOLDER, exist_ok=True)
 os.makedirs(DATA_FOLDER, exist_ok=True)
@@ -62,11 +57,13 @@ os.makedirs(DATA_FOLDER, exist_ok=True)
 Session(app)
 
 # CORS Configuration for Next.js
-CORS(app, 
-     origins=['http://localhost:3000', 'http://localhost:3001'],
-     supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+CORS(
+    app,
+    origins=['http://localhost:3000', 'http://localhost:3001'],
+    supports_credentials=True,
+    allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+)
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -77,9 +74,9 @@ PROCESSING_FILES = set()
 
 # Initialize AI processor
 processor = SyllabusProcessor()
- 
+
 # MEDIAPIPE HAND GESTURE DETECTION SETUP
- 
+
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(
     static_image_mode=False,
@@ -90,13 +87,14 @@ hands = mp_hands.Hands(
 mp_draw = mp.solutions.drawing_utils
 
 # HELPER FUNCTIONS
- 
+
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed (new version)"""
     if '.' not in filename:
         return False
     ext = filename.rsplit('.', 1)[-1].lower()
     return ext in ALLOWED_EXTENSIONS
+
 
 def find_uploaded_file_by_id(prefix_id: str) -> str | None:
     """Finds a file in the upload folder by its UUID prefix"""
@@ -105,99 +103,145 @@ def find_uploaded_file_by_id(prefix_id: str) -> str | None:
         if fname.startswith(prefix_id + "_"):
             return os.path.join(folder, fname)
     return None
-
-# ==================================================================
-# BEGIN FIXED CODE BLOCK
-# ==================================================================
+ 
+# BEGIN FIXED CODE BLOCK (updated gesture detection)
+ 
 
 def detect_gesture(img: np.ndarray) -> str:
     """
-    Detect hand gestures using MediaPipe with more robust logic.
-    Checks for curled vs. straight fingers.
+    Detect hand gestures using MediaPipe with clearer separation between:
+      - open_palm  -> start/next
+      - fist       -> previous
+      - point      -> select
+      - thumbs_up  -> confirm
+      - thumbs_down-> cancel
+
+    Updated to:
+      - Prioritize POINT over FIST
+      - Make FIST stricter (index must not look extended)
+      - Make POINT slightly more forgiving on index extension
     """
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(img_rgb)
-    
+
     if not results.multi_hand_landmarks:
         return 'none'
-    
+
     for hand_landmarks in results.multi_hand_landmarks:
         landmarks = hand_landmarks.landmark
-        
-        # --- Get all relevant landmarks ---
+
         try:
-            # Tips
-            thumb_tip = landmarks[mp_hands.HandLandmark.THUMB_TIP]       # 4
-            index_tip = landmarks[mp_hands.HandLandmark.INDEX_FINGER_TIP] # 8
-            middle_tip = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]# 12
-            ring_tip = landmarks[mp_hands.HandLandmark.RING_FINGER_TIP]   # 16
-            pinky_tip = landmarks[mp_hands.HandLandmark.PINKY_TIP]      # 20
-            
-            # PIPs (middle joints)
-            index_pip = landmarks[mp_hands.HandLandmark.INDEX_FINGER_PIP] # 6
-            middle_pip = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_PIP]# 10
-            ring_pip = landmarks[mp_hands.HandLandmark.RING_FINGER_PIP]   # 14
-            pinky_pip = landmarks[mp_hands.HandLandmark.PINKY_PIP]      # 18
-            
-            # MCPs (base knuckles)
-            thumb_mcp = landmarks[mp_hands.HandLandmark.THUMB_MCP]        # 2
-            index_mcp = landmarks[mp_hands.HandLandmark.INDEX_FINGER_MCP] # 5
-            
+            # Thumb
+            thumb_mcp = landmarks[mp_hands.HandLandmark.THUMB_MCP]
+            thumb_ip  = landmarks[mp_hands.HandLandmark.THUMB_IP]
+            thumb_tip = landmarks[mp_hands.HandLandmark.THUMB_TIP]
+
+            # Index
+            index_mcp = landmarks[mp_hands.HandLandmark.INDEX_FINGER_MCP]
+            index_pip = landmarks[mp_hands.HandLandmark.INDEX_FINGER_PIP]
+            index_tip = landmarks[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+
+            # Middle
+            middle_mcp = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_MCP]
+            middle_pip = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_PIP]
+            middle_tip = landmarks[mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+
+            # Ring
+            ring_mcp = landmarks[mp_hands.HandLandmark.RING_FINGER_MCP]
+            ring_pip = landmarks[mp_hands.HandLandmark.RING_FINGER_PIP]
+            ring_tip = landmarks[mp_hands.HandLandmark.RING_FINGER_TIP]
+
+            # Pinky
+            pinky_mcp = landmarks[mp_hands.HandLandmark.PINKY_MCP]
+            pinky_pip = landmarks[mp_hands.HandLandmark.PINKY_PIP]
+            pinky_tip = landmarks[mp_hands.HandLandmark.PINKY_TIP]
+
         except IndexError:
-            # This can happen if landmarks are not fully detected
+            # Landmarks not fully detected
             return 'unknown'
 
-        # --- Calculate finger states ---
-        # A finger is "straight" if its tip is higher (smaller Y) than its middle joint.
-        index_straight = index_tip.y < index_pip.y
-        
-        # A finger is "curled" if its tip is lower (larger Y) than its middle joint.
-        index_curled = index_tip.y > index_pip.y
-        middle_curled = middle_tip.y > middle_pip.y
-        ring_curled = ring_tip.y > ring_pip.y
-        pinky_curled = pinky_tip.y > pinky_pip.y
+        # ---- Helpers ----
+        # Slightly relaxed extended check for index, stricter curled check for fist
+        EXT_MARGIN = 0.035
+        CURL_MARGIN = 0.025
 
-        # --- Gesture Logic (Prioritized with if/elif) ---
-        
-        # 1. Check for POINT
-        # Condition: Index is straight, all others are curled.
-        # Thumb is also tucked in (tip lower than index pip).
-        if (index_straight and 
-            middle_curled and 
-            ring_curled and 
-            pinky_curled and
-            thumb_tip.y > index_pip.y): # Thumb tucked
-            return 'point'
-        
-        # 2. Check for THUMBS UP
-        # Condition: Thumb is "up" (tip higher than index base), other fingers are curled.
-        if (thumb_tip.y < index_mcp.y and
-            index_curled and
-            middle_curled and
-            ring_curled and
-            pinky_curled):
+        def is_extended(tip, pip, mcp, margin: float = EXT_MARGIN) -> bool:
+            """
+            Finger extended if tip is clearly above pip and mcp.
+            """
+            return (tip.y < pip.y - margin) and (pip.y < mcp.y - margin / 2)
+
+        def is_curled(tip, pip, mcp, margin: float = CURL_MARGIN) -> bool:
+            """
+            Finger curled if tip is clearly below pip (toward palm).
+            """
+            return tip.y > pip.y + margin
+
+        # Finger states
+        index_extended = is_extended(index_tip, index_pip, index_mcp)
+        middle_extended = is_extended(middle_tip, middle_pip, middle_mcp)
+        ring_extended = is_extended(ring_tip, ring_pip, ring_mcp)
+        pinky_extended = is_extended(pinky_tip, pinky_pip, pinky_mcp)
+
+        index_curled = is_curled(index_tip, index_pip, index_mcp)
+        middle_curled = is_curled(middle_tip, middle_pip, middle_mcp)
+        ring_curled = is_curled(ring_tip, ring_pip, ring_mcp)
+        pinky_curled = is_curled(pinky_tip, pinky_pip, pinky_mcp)
+
+        # Thumb orientation: vertical vs horizontal
+        thumb_vertical = abs(thumb_tip.y - thumb_mcp.y) > 1.2 * abs(thumb_tip.x - thumb_mcp.x)
+        thumb_up = thumb_vertical and (thumb_tip.y < thumb_mcp.y - 0.05)
+        thumb_down = thumb_vertical and (thumb_tip.y > thumb_mcp.y + 0.05)
+
+        # Finger spread (for open palm)
+        finger_spread = abs(index_tip.x - pinky_tip.x)
+
+        # --- Gesture Logic (order matters!) ---
+        # 1) THUMBS UP: thumb vertical & up, others curled
+        if thumb_up and index_curled and middle_curled and ring_curled and pinky_curled:
             return 'thumbs_up'
-            
-        # 3. Check for THUMBS DOWN
-        # Condition: Thumb is "down" (tip lower than its own base), other fingers are curled.
-        if (thumb_tip.y > thumb_mcp.y and # Thumb points down relative to its base
-            index_curled and
-            middle_curled and
-            ring_curled and
-            pinky_curled):
+
+        # 2) THUMBS DOWN: thumb vertical & down, others curled
+        if thumb_down and index_curled and middle_curled and ring_curled and pinky_curled:
             return 'thumbs_down'
 
-    # Default case if no specific gesture is matched
+        # 3) POINT: index clearly extended, others not extended, thumb not vertical
+        #    -> PRIORITIZED BEFORE FIST NOW
+        if (
+            index_extended and
+            not (middle_extended or ring_extended or pinky_extended) and  # only index extended
+            (middle_curled or ring_curled or pinky_curled) and            # at least one curled
+            not thumb_vertical
+        ):
+            return 'point'
+
+        # 4) FIST: all fingers clearly curled, and index definitely not extended
+        if (
+            index_curled and middle_curled and ring_curled and pinky_curled and
+            not index_extended
+        ):
+            return 'fist'
+
+        # 5) OPEN PALM: all four fingers extended AND spread out
+        if (
+            index_extended and middle_extended and ring_extended and pinky_extended and
+            finger_spread > 0.15
+        ):
+            return 'open_palm'
+
+    # No confident match
     return 'unknown'
 
-# ==================================================================
+ 
 # END FIXED CODE BLOCK
-# ==================================================================
+ 
+
 
 def speak_without_saving(text: str):
     """Placeholder for text-to-speech"""
     print(f"[TTS]: {text}")
     # TODO: Implement actual TTS
+
 
 def process_file_with_ai(file_path: str) -> Dict[str, Any]:
     """
@@ -214,10 +258,11 @@ def process_file_with_ai(file_path: str) -> Dict[str, Any]:
     except Exception as e:
         print(f"Error in process_file_with_ai: {e}")
         return {'success': False, 'error': str(e), 'modules': []}
- 
-# GESTURE-BASED UPLOAD ROUTES  
- 
+
+# GESTURE-BASED UPLOAD ROUTES
+
 gesture_bp = Blueprint('gesture', __name__, url_prefix='/api/gesture')
+
 
 @gesture_bp.route('/detect', methods=['POST', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
@@ -225,7 +270,7 @@ def detect_image():
     """Main gesture detection endpoint (one-step process)"""
     if request.method == 'OPTIONS':
         return jsonify({'status': 'OK'}), 200
-    
+
     try:
         # --- Start of Gesture Logic ---
         if 'gesture_state' not in session:
@@ -235,90 +280,189 @@ def detect_image():
             session['selected_file'] = None
             session['debounce_time'] = 0
             session['anonymous_id'] = str(time.time()).replace('.', '')
-        
+            # New for gesture stability
+            session['last_raw_gesture'] = 'none'
+            session['gesture_start_time'] = 0.0
+
         DEBOUNCE_INTERVAL = 2.0
         SPEAK_INTERVAL = 3.0
-        
+
         data = request.get_json()
         if not data or 'image' not in data:
-            return jsonify({'error': 'No image data provided', 'status': 'Error: No image data', 'gesture': 'unknown', 'state': 'ERROR'}), 400
-        
+            return jsonify({
+                'error': 'No image data provided',
+                'status': 'Error: No image data',
+                'gesture': 'unknown',
+                'state': 'ERROR'
+            }), 400
+
         current_time = time.time()
-        
+
+        raw_gesture = 'none'
+        gesture = 'none'
+
         try:
             image_data = data.get('image', '').split(',')[1]
             np_arr = np.frombuffer(base64.b64decode(image_data), np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            gesture = 'none' if img is None else detect_gesture(img)
+            raw_gesture = 'none' if img is None else detect_gesture(img)
         except Exception as e:
             print(f"Image processing error: {e}")
+            raw_gesture = 'none'
+
+        # ---- Gesture stability filter (to avoid quick mis-detections) ----
+        STABLE_GESTURE_TIME = 0.35  # seconds the same gesture must be seen
+
+        last_raw = session.get('last_raw_gesture', 'none')
+        gesture_start_time = session.get('gesture_start_time', current_time)
+
+        if raw_gesture == last_raw and raw_gesture not in ('none', 'unknown'):
+            # Same gesture continuing
+            if current_time - gesture_start_time >= STABLE_GESTURE_TIME:
+                gesture = raw_gesture
+            else:
+                gesture = 'none'  # not stable long enough yet
+        else:
+            # New gesture started or went back to none
+            session['last_raw_gesture'] = raw_gesture
+            session['gesture_start_time'] = current_time
             gesture = 'none'
-        
+
         try:
             all_files = os.listdir(GESTURE_SOURCE_FOLDER)
             files = [f for f in all_files if allowed_file(f) and not f.startswith('.')]
         except Exception as e:
             print(f"File listing error: {e}")
             files = []
-        
+
         if not files:
-            return jsonify({'status': f'No valid files (pdf, txt) found in {GESTURE_SOURCE_FOLDER}', 'gesture': gesture, 'state': 'NO_FILES', 'current_file': None})
-        
+            return jsonify({
+                'status': f'No valid files (pdf, txt) found in {GESTURE_SOURCE_FOLDER}',
+                'gesture': gesture,
+                'raw_gesture': raw_gesture,
+                'state': 'NO_FILES',
+                'current_file': None
+            })
+
         current_index = session.get('current_file_index', 0)
         current_state = session.get('gesture_state', 'IDLE')
         last_speak_time = session.get('last_speak_time', 0)
         debounce_time = session.get('debounce_time', 0)
-        
+
         if current_index >= len(files):
             current_index = 0
             session['current_file_index'] = 0
-        
+
         if current_time - debounce_time < DEBOUNCE_INTERVAL:
-            return jsonify({'status': f'Processing... {current_state}', 'gesture': gesture, 'state': current_state, 'current_file': files[current_index]})
-        
-        response_data = {'status': 'Ready', 'gesture': gesture, 'state': current_state, 'current_file': files[current_index], 'total_files': len(files)}
-        
-        # STATE MACHINE
+            return jsonify({
+                'status': f'Processing... {current_state}',
+                'gesture': gesture,
+                'raw_gesture': raw_gesture,
+                'state': current_state,
+                'current_file': files[current_index]
+            })
+
+        response_data = {
+            'status': 'Ready',
+            'gesture': gesture,          # stable gesture
+            'raw_gesture': raw_gesture,  # immediate detection (debugging)
+            'state': current_state,
+            'current_file': files[current_index],
+            'total_files': len(files)
+        }
+
+               # STATE MACHINE
         if current_state == 'IDLE':
-            if gesture == 'point':
+            # Start browsing with OPEN PALM instead of POINT
+            if gesture == 'open_palm':
                 session['gesture_state'] = 'BROWSING'
                 session['current_file_index'] = 0
                 session['debounce_time'] = current_time
                 if current_time - last_speak_time > SPEAK_INTERVAL:
-                    threading.Thread(target=speak_without_saving, args=(f"Started browsing. Current file: {files[0]}",), daemon=True).start()
+                    threading.Thread(
+                        target=speak_without_saving,
+                        args=(f"Started browsing. Current file: {files[0]}",),
+                        daemon=True
+                    ).start()
                     session['last_speak_time'] = current_time
-                response_data.update({'status': 'Started browsing files', 'state': 'BROWSING'})
-        
+                response_data.update({
+                    'status': 'Started browsing files',
+                    'state': 'BROWSING'
+                })
+
         elif current_state == 'BROWSING':
-            if gesture == 'thumbs_up':
+            # OPEN PALM -> NEXT FILE
+            if gesture == 'open_palm':
                 current_index = (current_index + 1) % len(files)
                 session['current_file_index'] = current_index
                 session['debounce_time'] = current_time
                 if current_time - last_speak_time > SPEAK_INTERVAL:
-                    threading.Thread(target=speak_without_saving, args=(f"File: {files[current_index]}",), daemon=True).start()
+                    threading.Thread(
+                        target=speak_without_saving,
+                        args=(f"File: {files[current_index]}",),
+                        daemon=True
+                    ).start()
                     session['last_speak_time'] = current_time
-                response_data.update({'status': f'Browsing: {files[current_index]}', 'current_file': files[current_index]})
-            
-            elif gesture == 'thumbs_down':
+                response_data.update({
+                    'status': f'Browsing: {files[current_index]}',
+                    'current_file': files[current_index]
+                })
+
+            # FIST -> PREVIOUS FILE
+            elif gesture == 'fist':
                 current_index = (current_index - 1) % len(files)
                 session['current_file_index'] = current_index
                 session['debounce_time'] = current_time
                 if current_time - last_speak_time > SPEAK_INTERVAL:
-                    threading.Thread(target=speak_without_saving, args=(f"File: {files[current_index]}",), daemon=True).start()
+                    threading.Thread(
+                        target=speak_without_saving,
+                        args=(f"File: {files[current_index]}",),
+                        daemon=True
+                    ).start()
                     session['last_speak_time'] = current_time
-                response_data.update({'status': f'Browsing: {files[current_index]}', 'current_file': files[current_index]})
-            
+                response_data.update({
+                    'status': f'Browsing: {files[current_index]}',
+                    'current_file': files[current_index]
+                })
+
+            # POINT -> SELECT FILE (go to CONFIRMING)
             elif gesture == 'point':
                 session['gesture_state'] = 'CONFIRMING'
                 session['selected_file'] = files[current_index]
                 session['confirmation_start'] = current_time
                 session['debounce_time'] = current_time
                 if current_time - last_speak_time > SPEAK_INTERVAL:
-                    threading.Thread(target=speak_without_saving, args=(f"Selected {files[current_index]}. Show thumbs up to confirm upload.",), daemon=True).start()
+                    threading.Thread(
+                        target=speak_without_saving,
+                        args=(f"Selected {files[current_index]}. Show thumbs up to confirm, thumbs down to cancel.",),
+                        daemon=True
+                    ).start()
                     session['last_speak_time'] = current_time
-                response_data.update({'status': f'Confirm upload of {files[current_index]}?', 'state': 'CONFIRMING', 'selected_file': files[current_index]})
-        
+                response_data.update({
+                    'status': f'Confirm upload of {files[current_index]}?',
+                    'state': 'CONFIRMING',
+                    'selected_file': files[current_index]
+                })
+
+            # THUMBS DOWN -> EXIT BROWSING, BACK TO IDLE
+            elif gesture == 'thumbs_down':
+                session['gesture_state'] = 'IDLE'
+                session['selected_file'] = None
+                session['debounce_time'] = current_time
+                if current_time - last_speak_time > SPEAK_INTERVAL:
+                    threading.Thread(
+                        target=speak_without_saving,
+                        args=("Browsing cancelled. Back to idle.",),
+                        daemon=True
+                    ).start()
+                    session['last_speak_time'] = current_time
+                response_data.update({
+                    'status': 'Browsing cancelled',
+                    'state': 'IDLE'
+                })
+
         elif current_state == 'CONFIRMING':
+            # THUMBS UP -> CONFIRM UPLOAD (only meaning for 👍)
             if gesture == 'thumbs_up':
                 selected_file = session.get('selected_file')
                 source_path = os.path.join(GESTURE_SOURCE_FOLDER, selected_file)
@@ -326,46 +470,75 @@ def detect_image():
                 try:
                     import shutil
                     shutil.copy2(source_path, dest_path)
-                    processing_result = process_file_with_ai(dest_path) # One-step process
+                    processing_result = process_file_with_ai(dest_path)  # One-step process
                     session['gesture_state'] = 'IDLE'
                     session['debounce_time'] = current_time
                     if current_time - last_speak_time > SPEAK_INTERVAL:
-                        threading.Thread(target=speak_without_saving, args=(f"Upload successful. Processing complete.",), daemon=True).start()
+                        threading.Thread(
+                            target=speak_without_saving,
+                            args=("Upload successful. Processing complete.",),
+                            daemon=True
+                        ).start()
                         session['last_speak_time'] = current_time
-                    response_data.update({'status': 'Upload successful', 'state': 'IDLE', 'uploaded_file': selected_file, 'processing_result': processing_result})
+                    response_data.update({
+                        'status': 'Upload successful',
+                        'state': 'IDLE',
+                        'uploaded_file': selected_file,
+                        'processing_result': processing_result
+                    })
                 except Exception as e:
                     print(f"Upload error: {e}")
-                    response_data.update({'status': f'Upload failed: {str(e)}', 'state': 'ERROR'})
-            
+                    response_data.update({
+                        'status': f'Upload failed: {str(e)}',
+                        'state': 'ERROR'
+                    })
+
+            # THUMBS DOWN -> CANCEL CONFIRMATION (back to BROWSING)
             elif gesture == 'thumbs_down':
                 session['gesture_state'] = 'BROWSING'
                 session['selected_file'] = None
                 session['debounce_time'] = current_time
                 if current_time - last_speak_time > SPEAK_INTERVAL:
-                    threading.Thread(target=speak_without_saving, args=("Selection cancelled. Continue browsing.",), daemon=True).start()
+                    threading.Thread(
+                        target=speak_without_saving,
+                        args=("Selection cancelled. Continue browsing.",),
+                        daemon=True
+                    ).start()
                     session['last_speak_time'] = current_time
-                response_data.update({'status': 'Selection cancelled', 'state': 'BROWSING'})
-        
+                response_data.update({
+                    'status': 'Selection cancelled',
+                    'state': 'BROWSING'
+                })
+
+
         # --- End of Gesture Logic ---
         session.modified = True
         return jsonify(response_data)
-    
+
     except Exception as e:
         print(f"Critical error in detect_image: {e}")
-        return jsonify({'error': str(e), 'status': 'System error', 'gesture': 'unknown', 'state': 'ERROR'}), 500
+        return jsonify({
+            'error': str(e),
+            'status': 'System error',
+            'gesture': 'unknown',
+            'state': 'ERROR'
+        }), 500
 
-# (Other gesture routes remain unchanged)
+
 @gesture_bp.route('/reset', methods=['POST', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
 def reset_session():
-    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'OK'}), 200
     session.clear()
     return jsonify({'status': 'Session reset', 'state': 'RESET'})
+
 
 @gesture_bp.route('/status', methods=['GET', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
 def session_status():
-    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'OK'}), 200
     return jsonify({
         'anonymous_id': session.get('anonymous_id', 'none'),
         'gesture_state': session.get('gesture_state', 'IDLE'),
@@ -375,8 +548,9 @@ def session_status():
     })
 
 # MANUAL UPLOAD ROUTES (Blueprint) - MODIFIED FOR 2-STEP PROCESS
- 
+
 upload_bp = Blueprint('upload', __name__, url_prefix='/api/upload')
+
 
 @upload_bp.route('/', methods=['POST', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
@@ -416,9 +590,10 @@ def upload_file():
     except Exception:
         logger.exception("Upload error")
         return jsonify({'success': False, 'error': 'Failed to save file'}), 500
- 
+
 # NEW ROOT ROUTES FOR 2-STEP PROCESSING
- 
+
+
 @app.route('/api/process', methods=['POST', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
 def process_syllabus():
@@ -428,7 +603,7 @@ def process_syllabus():
     """
     if request.method == 'OPTIONS':
         return jsonify({'status': 'OK'}), 200
-        
+
     data = request.get_json(silent=True) or {}
     file_id = data.get('file_id')
 
@@ -437,7 +612,10 @@ def process_syllabus():
 
     if file_id in PROCESSING_FILES:
         logger.warning(f"Attempted to process an already processing file: {file_id}")
-        return jsonify({'success': False, 'error': 'This file is already being processed. Please wait.'}), 409
+        return jsonify({
+            'success': False,
+            'error': 'This file is already being processed. Please wait.'
+        }), 409
 
     uploaded_file = find_uploaded_file_by_id(file_id)
     if not uploaded_file:
@@ -449,9 +627,12 @@ def process_syllabus():
 
         # Use the global processor instance
         result = processor.process_syllabus(uploaded_file)
-        
+
         if not result.get('success'):
-            return jsonify({'success': False, 'error': result.get('error', 'Processing failed')}), 500
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Processing failed')
+            }), 500
 
         session_id = str(uuid.uuid4())
         result.update({
@@ -463,7 +644,9 @@ def process_syllabus():
         with open(result_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Processing completed. Session ID: {session_id}, Modules: {len(result.get('modules', []))}")
+        logger.info(
+            f"Processing completed. Session ID: {session_id}, Modules: {len(result.get('modules', []))}"
+        )
 
         return jsonify({
             'success': True,
@@ -474,8 +657,11 @@ def process_syllabus():
 
     except Exception as e:
         logger.exception("Processing error during main execution")
-        return jsonify({'success': False, 'error': f'An unexpected error occurred: {str(e)}'}), 500
-    
+        return jsonify({
+            'success': False,
+            'error': f'An unexpected error occurred: {str(e)}'
+        }), 500
+
     finally:
         if file_id in PROCESSING_FILES:
             PROCESSING_FILES.remove(file_id)
@@ -517,9 +703,11 @@ def get_results():
 
 # REGISTER BLUEPRINTS
 app.register_blueprint(gesture_bp)
-app.register_blueprint(upload_bp) 
+app.register_blueprint(upload_bp)
 
-# OutComes generation route
+# Outcomes generation route
+
+
 @app.route('/api/generate_outcomes', methods=['GET', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
 def generate_outcomes():
@@ -537,40 +725,44 @@ def generate_outcomes():
     safe_id = secure_filename(session_id)
     result_path = os.path.join(DATA_FOLDER, f"{safe_id}.json")
     if not os.path.exists(result_path):
-        return jsonify({'success': False, 'error': 'Results not found for provided session_id'}), 404
+        return jsonify({
+            'success': False,
+            'error': 'Results not found for provided session_id'
+        }), 404
 
     try:
         with open(result_path, 'r', encoding='utf-8') as f:
             results = json.load(f)
         modules = results.get('modules', [])
         if not modules:
-            return jsonify({'success': False, 'error': 'No modules available in results'}), 400
+            return jsonify({
+                'success': False,
+                'error': 'No modules available in results'
+            }), 400
 
-        # analyser.generate_course_outcomes_from_modules is expected to return a JSON-serializable structure
-        # outcomes = generate_course_outcomes_from_modules(modules)
-        # outcomes = analyser.generate_course_outcomes_from_modules(modules)
         outcomes = analyser.generate_outcomes_per_module(modules)
-           # Print formatted results in terminal
+        # Print formatted results in terminal
         analyser.print_generated_outcomes(outcomes)
 
         logger.info(f"Generated outcomes for session {session_id}")
-        # return jsonify({
-        #     'success': True,
-        #     'session_id': session_id,
-        #     'outcomes': outcomes
-        # }), 200
+
         return jsonify({
-                'success': True,
-                'session_id': session_id,
-                'models_loaded': getattr(analyser, "MODELS_LOADED", False),
-                'outcomes': outcomes,
-                'course_outcomes': outcomes 
-            }), 200
+            'success': True,
+            'session_id': session_id,
+            'models_loaded': getattr(analyser, "MODELS_LOADED", False),
+            'outcomes': outcomes,
+            'course_outcomes': outcomes
+        }), 200
     except Exception as e:
         logger.exception("Error generating outcomes")
-        return jsonify({'success': False, 'error': f'Failed to generate outcomes: {str(e)}'}), 500
+        return jsonify({
+            'success': False,
+            'error': f'Failed to generate outcomes: {str(e)}'
+        }), 500
 
 # HEALTH CHECK & ROOT ROUTES
+
+
 @app.route('/')
 def index():
     return jsonify({
@@ -585,7 +777,8 @@ def index():
         }
     })
 
-@app.route('/health') 
+
+@app.route('/health')
 def health_check():
     return jsonify({
         'status': 'healthy',
@@ -595,12 +788,14 @@ def health_check():
 
 # ERROR HANDLERS
 
+
 @app.errorhandler(413)
 def request_entity_too_large(error):
     return jsonify({
         'success': False,
         'error': f'File too large. Maximum size is {MAX_FILE_SIZE // 1024 // 1024}MB.'
     }), 413
+
 
 @app.errorhandler(500)
 def internal_server_error(error):
@@ -611,20 +806,20 @@ def internal_server_error(error):
     }), 500
 
 # MAIN ENTRY POINT
- 
+
 if __name__ == '__main__':
     print("=" * 70)
-    print("🚀 Unified Syllabus Upload & Processing Backend (v1.1)")
+    print("Unified Syllabus Upload & Processing Backend (v1.1)")
     print("=" * 70)
-    print(f"📁 Upload folder: {UPLOAD_FOLDER}")
-    print(f"🤚 Gesture source folder: {GESTURE_SOURCE_FOLDER}")
-    print(f"📄 Data folder: {DATA_FOLDER}")
-    print(f"🌐 CORS enabled for: http://localhost:3000, http://localhost:3001")
-    print(f"⚖️  Max file size: {MAX_FILE_SIZE // 1024 // 1024}MB")
-    print(f"✅ Allowed types: {ALLOWED_EXTENSIONS}")
+    print(f"Upload folder: {UPLOAD_FOLDER}")
+    print(f"Gesture source folder: {GESTURE_SOURCE_FOLDER}")
+    print(f"Data folder: {DATA_FOLDER}")
+    print(f"CORS enabled for: http://localhost:3000, http://localhost:3001")
+    print(f" Max file size: {MAX_FILE_SIZE // 1024 // 1024}MB")
+    print(f"Allowed types: {ALLOWED_EXTENSIONS}")
     print("=" * 70)
-    print("\n📡 Starting Flask server...\n")
-    
+    print("\n Starting Flask server...\n")
+
     app.run(
         host='0.0.0.0',
         port=5001,

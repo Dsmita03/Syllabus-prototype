@@ -10,6 +10,7 @@ const API_BASE_URL = 'http://localhost:5001';
 interface GestureResponse {
   status: string;
   gesture: string;
+  raw_gesture?: string;
   state: string;
   current_file?: string;
   total_files?: number;
@@ -18,6 +19,28 @@ interface GestureResponse {
   processing_result?: any;
   error?: string;
 }
+  const getGestureMeaning = (gesture: string, state: string) => {
+    switch (gesture) {
+      case 'open_palm':
+        // In IDLE it's "Start", in BROWSING it's "Next"
+        return state === 'IDLE' ? 'Start browsing' : 'Next file';
+      case 'fist':
+        return 'Previous file';
+      case 'point':
+        return 'Select current file';
+      case 'thumbs_up':
+        return 'Confirm & upload';
+      case 'thumbs_down':
+        return state === 'CONFIRMING' ? 'Cancel selection' : 'Exit browsing';
+      case 'none':
+        return 'No stable gesture detected';
+      case 'unknown':
+        return 'Unrecognized hand pose';
+      default:
+        return '';
+    }
+  };
+
 
 export default function GestureUploadPage() {
   // Camera and video refs
@@ -244,6 +267,7 @@ export default function GestureUploadPage() {
     }, 500); // Send frame every 500ms
 
     return () => clearInterval(intervalId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isCameraActive]);
 
   // Cleanup on unmount
@@ -264,12 +288,16 @@ export default function GestureUploadPage() {
         return 'bg-[#BBDCE5]';
       case 'ERROR':
         return 'bg-red-500';
+      case 'NO_FILES':
+        return 'bg-orange-500';
+      case 'RESET':
+        return 'bg-gray-300';
       default:
         return 'bg-gray-400';
     }
   };
 
-  // Get gesture icon
+  // Get gesture icon (updated to match backend gestures)
   const getGestureEmoji = (gesture: string) => {
     switch (gesture) {
       case 'thumbs_up':
@@ -278,8 +306,14 @@ export default function GestureUploadPage() {
         return '👎';
       case 'point':
         return '👉';
-      case 'none':
+      case 'open_palm':
         return '✋';
+      case 'fist':
+        return '✊';
+      case 'none':
+        return '🤚';
+      case 'unknown':
+        return '❓';
       default:
         return '🤚';
     }
@@ -364,22 +398,36 @@ export default function GestureUploadPage() {
               )}
             </div>
 
-            {/* Gesture Instructions */}
-            <div className="mt-6 grid grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-[#BBDCE5] to-[#a5cfd8] p-4 rounded-xl text-center shadow-md border border-[#91bcc6]/30">
-                <div className="text-3xl mb-2">👉</div>
-                <div className="font-semibold text-white text-sm">Point</div>
-                <div className="text-white/80 text-xs mt-1">Start/Select</div>
+            {/* Gesture Instructions - Updated to match backend */}
+            <div className="mt-6 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gradient-to-br from-[#BBDCE5] to-[#a5cfd8] p-4 rounded-xl text-center shadow-md border border-[#91bcc6]/30">
+                  <div className="text-3xl mb-2">✋</div>
+                  <div className="font-semibold text-white text-sm">Open Palm</div>
+                  <div className="text-white/80 text-xs mt-1">Start/Next</div>
+                </div>
+                <div className="bg-gradient-to-br from-[#5da8bd] to-[#71a9b8] p-4 rounded-xl text-center shadow-md border border-[#5da8bd]/30">
+                  <div className="text-3xl mb-2">✊</div>
+                  <div className="font-semibold text-white text-sm">Fist</div>
+                  <div className="text-white/80 text-xs mt-1">Previous</div>
+                </div>
               </div>
-              <div className="bg-gradient-to-br from-[#5da8bd] to-[#71a9b8] p-4 rounded-xl text-center shadow-md border border-[#5da8bd]/30">
-                <div className="text-3xl mb-2">👍</div>
-                <div className="font-semibold text-white text-sm">Thumbs Up</div>
-                <div className="text-white/80 text-xs mt-1">Next/Confirm</div>
-              </div>
-              <div className="bg-gradient-to-br from-[#91bcc6] to-[#BBDCE5] p-4 rounded-xl text-center shadow-md border border-[#71a9b8]/30">
-                <div className="text-3xl mb-2">👎</div>
-                <div className="font-semibold text-white text-sm">Thumbs Down</div>
-                <div className="text-white/80 text-xs mt-1">Previous/Cancel</div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gradient-to-br from-[#91bcc6] to-[#BBDCE5] p-4 rounded-xl text-center shadow-md border border-[#71a9b8]/30">
+                  <div className="text-3xl mb-2">👉</div>
+                  <div className="font-semibold text-white text-sm">Point</div>
+                  <div className="text-white/80 text-xs mt-1">Select</div>
+                </div>
+                <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-center shadow-md">
+                  <div className="text-3xl mb-2">👍</div>
+                  <div className="font-semibold text-white text-sm">Thumbs Up</div>
+                  <div className="text-white/80 text-xs mt-1">Confirm</div>
+                </div>
+                <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl text-center shadow-md">
+                  <div className="text-3xl mb-2">👎</div>
+                  <div className="font-semibold text-white text-sm">Thumbs Down</div>
+                  <div className="text-white/80 text-xs mt-1">Cancel</div>
+                </div>
               </div>
             </div>
           </div>
@@ -400,18 +448,48 @@ export default function GestureUploadPage() {
                     <span className="font-bold text-[#6b8288] text-lg">{gestureData.state}</span>
                   </div>
                 </div>
-
+{/* 
                 <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
                   <div className="text-sm text-gray-600 mb-2 font-medium">
-                    Current Gesture
+                    Detected Gesture
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-4xl">{getGestureEmoji(gestureData.gesture)}</span>
-                    <span className="font-semibold text-[#6b8288] text-lg capitalize">
-                      {gestureData.gesture.replace('_', ' ')}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-[#6b8288] text-lg capitalize">
+                        {gestureData.gesture.replace('_', ' ')}
+                      </span>
+                      {gestureData.raw_gesture && gestureData.raw_gesture !== gestureData.gesture && (
+                        <span className="text-xs text-gray-500">
+                          Raw: {gestureData.raw_gesture.replace('_', ' ')}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                </div> */}
+               <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
+               <div className="text-sm text-gray-600 mb-2 font-medium">
+                 Detected Gesture
                 </div>
+                <div className="flex items-center gap-3">
+                <span className="text-4xl">{getGestureEmoji(gestureData.gesture)}</span>
+               <div className="flex flex-col">
+               <span className="font-semibold text-[#6b8288] text-lg capitalize">
+               {gestureData.gesture.replace('_', ' ')}
+               </span>
+               <span className="text-xs text-gray-600">
+                {getGestureMeaning(gestureData.gesture, gestureData.state)}
+               </span>
+                {gestureData.raw_gesture &&
+                gestureData.raw_gesture !== gestureData.gesture && (
+               <span className="text-xs text-gray-500 mt-1">
+                Raw: {gestureData.raw_gesture.replace('_', ' ')}
+               </span>
+                )}
+               </div>
+              </div>
+            </div>
+
 
                 <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
                   <div className="text-sm text-gray-600 mb-2 font-medium">Status</div>
@@ -432,7 +510,21 @@ export default function GestureUploadPage() {
                   </div>
                 )}
 
-                {gestureData.total_files && (
+                {gestureData.selected_file && (
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 shadow-md">
+                    <div className="text-sm text-white/90 mb-2 font-medium">
+                      Selected File (Awaiting Confirmation)
+                    </div>
+                    <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm p-3 rounded-lg">
+                      <FileText className="w-5 h-5 text-white" />
+                      <span className="text-sm font-mono text-white font-medium break-all">
+                        {gestureData.selected_file}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {gestureData.total_files !== undefined && (
                   <div className="bg-[#ECEEDF] rounded-xl p-4 border border-[#D9C4B0]/30">
                     <div className="text-sm text-gray-600 mb-1 font-medium">
                       Total Files Available
@@ -512,39 +604,77 @@ export default function GestureUploadPage() {
         {/* Tips Section */}
         <div className="mt-12 bg-white rounded-2xl shadow-xl p-8 border border-[#D9C4B0]/30">
           <h2 className="text-2xl font-semibold text-[#6b8288] mb-6">
-            Tips for Better Gesture Recognition
+            How to Use Gesture Control
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="flex items-start gap-4 p-5 bg-[#ECEEDF] rounded-xl border border-[#D9C4B0]/30">
               <div className="w-12 h-12 bg-gradient-to-br from-[#BBDCE5] to-[#a5cfd8] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-                <span className="text-2xl">💡</span>
+                <span className="text-2xl">✋</span>
               </div>
               <div>
-                <div className="font-semibold text-[#6b8288] mb-1">Good Lighting</div>
+                <div className="font-semibold text-[#6b8288] mb-1">Start Browsing</div>
                 <div className="text-sm text-gray-600">
-                  Ensure adequate lighting for clear hand detection
+                  Show open palm to start or go to next file
                 </div>
               </div>
             </div>
             <div className="flex items-start gap-4 p-5 bg-[#ECEEDF] rounded-xl border border-[#D9C4B0]/30">
               <div className="w-12 h-12 bg-gradient-to-br from-[#5da8bd] to-[#71a9b8] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-                <span className="text-2xl">👁️</span>
+                <span className="text-2xl">✊</span>
               </div>
               <div>
-                <div className="font-semibold text-[#6b8288] mb-1">Clear View</div>
+                <div className="font-semibold text-[#6b8288] mb-1">Go Back</div>
                 <div className="text-sm text-gray-600">
-                  Keep hands visible within camera frame
+                  Make a fist to browse to previous file
                 </div>
               </div>
             </div>
             <div className="flex items-start gap-4 p-5 bg-[#ECEEDF] rounded-xl border border-[#D9C4B0]/30">
               <div className="w-12 h-12 bg-gradient-to-br from-[#91bcc6] to-[#BBDCE5] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-                <span className="text-2xl">🎯</span>
+                <span className="text-2xl">👉</span>
               </div>
               <div>
-                <div className="font-semibold text-[#6b8288] mb-1">Steady Movements</div>
+                <div className="font-semibold text-[#6b8288] mb-1">Select File</div>
                 <div className="text-sm text-gray-600">
-                  Make deliberate, steady gestures
+                  Point to select the current file
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-5 bg-[#ECEEDF] rounded-xl border border-[#D9C4B0]/30">
+              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
+                <span className="text-2xl">👍</span>
+              </div>
+              <div>
+                <div className="font-semibold text-[#6b8288] mb-1">Confirm</div>
+                <div className="text-sm text-gray-600">
+                  Thumbs up to confirm and upload
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 p-6 bg-gradient-to-r from-[#BBDCE5] to-[#a5cfd8] rounded-xl">
+            <h3 className="text-lg font-semibold text-white mb-4">Pro Tips for Better Detection</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 text-white">
+                <span className="text-2xl">💡</span>
+                <div>
+                  <div className="font-semibold mb-1">Good Lighting</div>
+                  <div className="text-sm text-white/90">Ensure adequate lighting for clear detection</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-white">
+                <span className="text-2xl">👁️</span>
+                <div>
+                  <div className="font-semibold mb-1">Clear View</div>
+                  <div className="text-sm text-white/90">Keep hands visible within frame</div>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-white">
+                <span className="text-2xl">🎯</span>
+                <div>
+                  <div className="font-semibold mb-1">Steady Gestures</div>
+                  <div className="text-sm text-white/90">Hold gestures for 0.35s to trigger</div>
                 </div>
               </div>
             </div>
