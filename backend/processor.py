@@ -579,6 +579,7 @@ JSON Output:
 
                 formatted_modules.append({
                     "id": f"module_{i + 1}",
+                    "module_id": i + 1, 
                     "title": title,
                     "content": content
                 })

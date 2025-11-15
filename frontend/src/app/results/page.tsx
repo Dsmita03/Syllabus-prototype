@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -55,9 +56,7 @@ export default function ResultsPage() {
   const [bookmarkedModules, setBookmarkedModules] = useState<Set<string>>(new Set());
   const searchParams = useSearchParams();
   const router = useRouter();
-  // const [courseOutcomes, setCourseOutcomes] = useState<string[]>([]);
   const [courseOutcomes, setCourseOutcomes] = useState<ModuleOutcome[]>([]);
-
   const [isGeneratingOutcomes, setIsGeneratingOutcomes] = useState(false);
   const [outcomeError, setOutcomeError] = useState<string>('');
 
@@ -69,7 +68,6 @@ export default function ResultsPage() {
         router.push('/');
         return;
       }
-
       try {
         const response = await fetch(`http://localhost:5001/api/results?session_id=${sessionId}`);
         const data = await response.json();
@@ -81,7 +79,6 @@ export default function ResultsPage() {
           setError(data.error || 'Failed to load results');
         }
       } catch (error) {
-        console.error('Failed to fetch results:', error);
         setError('Network error. Please check if the backend server is running.');
       } finally {
         setLoading(false);
@@ -113,11 +110,9 @@ export default function ResultsPage() {
         setCourseOutcomes(data.course_outcomes);
       } else {
         setOutcomeError(data.error || 'Failed to generate course outcomes from API.');
-        console.error('API Error generating outcomes:', data.error);
       }
     } catch (err) {
       setOutcomeError('Network error occurred while generating outcomes.');
-      console.error('Fetch error generating outcomes:', err);
     } finally {
       setIsGeneratingOutcomes(false);
     }
@@ -237,48 +232,46 @@ export default function ResultsPage() {
       {/* Top Action Bar */}
       <div className="bg-white/80 backdrop-blur-xl border-b border-[#D9C4B0]/30 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-md">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-md flex-shrink-0">
                 <Image src="/logo.png" alt="EduModule Logo" width={40} height={40} className="object-contain" />
               </div>
               <h1 className="text-lg font-semibold text-gray-800 tracking-wide">EduModule</h1>
             </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => router.push('/')}
-                className="flex items-center px-4 py-2 bg-[#5da8bd] text-white font-semibold rounded-lg hover:bg-[#71a9b8] transition-colors shadow-md hover:shadow-lg"
-              >
-                <Home className="w-4 h-4 mr-2" />
-                New Upload
-              </button>
-            </div>
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-2 px-4 py-2 bg-[#5da8bd] text-white font-semibold rounded-lg hover:bg-[#71a9b8] transition-colors shadow-md hover:shadow-lg"
+            >
+              <Home className="w-4 h-4" />
+              <span className="hidden sm:inline">New Upload</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid lg:grid-cols-12 gap-8">
+        <div className="grid md:grid-cols-12 lg:grid-cols-12 gap-6 lg:gap-8">
           {/* Left Sidebar - Module List */}
-          <aside className="lg:col-span-5">
+          <aside className="md:col-span-5 lg:col-span-5">
             <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 sticky top-24">
               {/* Module List Header */}
-              <div className="p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20 flex items-center justify-between">
+              <div className="p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl font-bold text-gray-900">Modules</h2>
                     <span className="px-3 py-1 bg-[#BBDCE5] text-white text-sm font-semibold rounded-full">{modules.length}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-30">
                     <p className="text-gray-600 text-sm">Select a module to view content</p>
                     <button
                       onClick={handlePrint}
-                      className="ml-2 flex items-center px-2 py-1 bg-[#5da8bd] text-white rounded hover:bg-[#91bcc6] transition-colors text-sm"
+                      className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#5da8bd] text-white rounded-lg hover:bg-[#91bcc6] transition-colors text-sm w-fit"
                       title="Print all modules"
                     >
-                      <Printer className="w-4 h-4 mr-1" />
-                      Print
+                      <Printer className="w-4 h-4" />
+                      <span>Print All</span>
                     </button>
                   </div>
                 </div>
@@ -304,47 +297,44 @@ export default function ResultsPage() {
           </aside>
 
           {/* Right Content Area */}
-          <section className="lg:col-span-7">
+          <section className="md:col-span-7 lg:col-span-7">
             {currentModule ? (
               <div className="space-y-6">
                 {/* Module Header */}
                 <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 p-8">
-                  <div className="flex items-start space-x-6">
+                  <div className="flex items-start gap-6">
                     <div className="w-16 h-16 bg-gradient-to-br from-[#4f8493] to-[#b8a18c] rounded-xl flex items-center justify-center">
                       <FileText className="w-8 h-8 text-white" />
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-3">
+                      <div className="flex items-center gap-3 mb-3">
                         <h3 className="text-3xl font-bold text-gray-900">{currentModule.title}</h3>
                         {completedModules.has(currentModule.id) && (
-                          <span className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                            <CheckCircle className="w-4 h-4 mr-1" />
+                          <span className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                            <CheckCircle className="w-4 h-4" />
                             Completed
                           </span>
                         )}
                       </div>
-
-                      {/* Module Meta Info */}
-                      <div className="flex items-center space-x-4 text-sm mb-4">
+                      <div className="flex flex-wrap items-center gap-3 text-sm mb-4">
                         {currentModule.questions && currentModule.questions.length > 0 && (
-                          <span className="flex items-center px-3 py-1 bg-[#BBDCE5]/20 text-[#BBDCE5] rounded-full font-medium border border-[#BBDCE5]/30">
-                            <HelpCircle className="w-4 h-4 mr-1" />
+                          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-[#BBDCE5]/20 text-[#BBDCE5] rounded-full font-medium border border-[#BBDCE5]/30">
+                            <HelpCircle className="w-4 h-4" />
                             {currentModule.questions.length} Questions
                           </span>
                         )}
-                        <span className="flex items-center px-3 py-1 bg-[#D9C4B0]/20 text-[#CFAB8D] rounded-full font-medium border border-[#D9C4B0]/30">
-                          <Clock className="w-4 h-4 mr-1" />
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-[#D9C4B0]/20 text-[#CFAB8D] rounded-full font-medium border border-[#D9C4B0]/30">
+                          <Clock className="w-4 h-4" />
                           {Math.ceil(currentModule.content.split(' ').length / 200)} min read
                         </span>
                       </div>
-
-                      <div className="flex items-center space-x-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         {currentModule.questions && currentModule.questions.length > 0 && (
                           <button
                             onClick={() => router.push(`/quiz?moduleId=${currentModule.id}`)}
                             className="flex items-center px-4 py-2 bg-[#BBDCE5] text-white rounded-lg hover:bg-[#a5cfd8] transition-colors font-medium"
                           >
-                            <Play className="w-4 h-4 mr-2" />
+                            <Play className="w-4 h-4" />
                             Start Quiz
                           </button>
                         )}
@@ -356,10 +346,9 @@ export default function ResultsPage() {
                               : 'bg-[#ECEEDF] text-gray-700 hover:bg-green-100 hover:text-green-700 border-[#D9C4B0]/30 hover:border-green-200'
                           }`}
                         >
-                          <CheckCircle className="w-4 h-4 mr-2" />
+                          <CheckCircle className="w-4 h-4" />
                           {completedModules.has(currentModule.id) ? 'Completed' : 'Mark Complete'}
                         </button>
-
                         <button
                           onClick={() => toggleBookmark(currentModule.id)}
                           className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors border ${
@@ -368,23 +357,22 @@ export default function ResultsPage() {
                               : 'bg-[#ECEEDF] text-gray-700 hover:bg-yellow-100 hover:text-yellow-700 border-[#D9C4B0]/30 hover:border-yellow-200'
                           }`}
                         >
-                          <Bookmark className="w-4 h-4 mr-2" />
+                          <Bookmark className="w-4 h-4" />
                           Bookmark
                         </button>
-
                         <button
                           onClick={handleGenerateOutcomes}
                           disabled={isGeneratingOutcomes || !modules.length}
                           className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors shadow-sm ${
                             isGeneratingOutcomes
                               ? 'bg-gray-400 text-white cursor-not-allowed border-gray-400'
-                              : 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 border-transparent'
+                              : 'bg-gradient-to-r  bg-[#5da8bd]  to-indigo-400 text-white  hover:bg-[#71a9b8] hover:to-indigo-700 border-transparent'
                           }`}
                         >
                           {isGeneratingOutcomes ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Award className="w-4 h-4 mr-2" />
+                            <Award className="w-4 h-4" />
                           )}
                           {isGeneratingOutcomes ? 'Generating...' : 'Course Outcomes'}
                         </button>
@@ -392,10 +380,9 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Module Content
+                {/* Module Content */}
                 <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30">
-                  <div className="flex items-center space-x-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
+                  <div className="flex items-center gap-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
                     <div className="w-10 h-10 bg-[#BBDCE5] rounded-lg flex items-center justify-center">
                       <BookOpen className="w-5 h-5 text-white" />
                     </div>
@@ -407,84 +394,64 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
-              </div> */}
-              {/* Course Outcomes Section */}
-{(isGeneratingOutcomes || courseOutcomes.length > 0 || outcomeError) && (
-  <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 mt-6">
-    <div className="flex items-center space-x-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
-      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
-        <Award className="w-5 h-5 text-white" />
-      </div>
-      <h4 className="text-xl font-bold text-gray-900">AI-Generated Course Outcomes</h4>
-    </div>
 
-    <div className="p-6">
-      {isGeneratingOutcomes && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin mr-3" />
-          <span className="text-gray-700 text-lg font-medium">Generating outcomes...</span>
-        </div>
-      )}
+                {/* Course Outcomes Section */}
+                {(isGeneratingOutcomes || courseOutcomes.length > 0 || outcomeError) && (
+                  <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 mt-6">
+                    <div className="flex items-center gap-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
+                      <div className="w-10 h-10 bg-gradient-to-br bg-[#5da8bd] hover:bg-[#71a9b8] rounded-lg flex items-center justify-center">
+                        <Award className="w-5 h-5 text-white" />
+                      </div>
+                      <h4 className="text-xl font-bold text-gray-900">AI-Generated Course Outcomes</h4>
+                    </div>
+                    <div className="p-6">
+                      {isGeneratingOutcomes && (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                          <span className="text-gray-700 text-lg font-medium ml-3">Generating outcomes...</span>
+                        </div>
+                      )}
 
-      {outcomeError && (
-        <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200">
-          ⚠️ {outcomeError}
-        </div>
-      )}
+                      {outcomeError && (
+                        <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200">
+                          ⚠️ {outcomeError}
+                        </div>
+                      )}
 
-      {/* {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
-        <ul className="space-y-4">
-          {courseOutcomes.map((outcome, idx) => (
-            <li
-              key={idx}
-              className="flex items-start space-x-3 bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 p-4 rounded-xl border border-[#BBDCE5]/30 shadow-sm"
-            >
-              <span className="w-6 h-6 flex items-center justify-center bg-[#BBDCE5] text-white font-semibold rounded-full">
-                {idx + 1}
-              </span>
-              <p className="text-gray-800 leading-relaxed">{outcome}</p>
-            </li>
-          ))}
-        </ul>
-      )} */}
-      {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
-  <div className="space-y-8">
-    {courseOutcomes.map((module, moduleIndex) => (
-      <div key={moduleIndex} className="bg-white p-6 rounded-xl shadow border border-[#D9C4B0]/40">
-        <h3 className="text-2xl font-bold text-gray-900 mb-4">
-          Module {module.module_id}: {module.title}
-        </h3>
-
-        <div className="mb-4">
-          <h4 className="font-semibold text-gray-700">Keywords:</h4>
-          <p className="text-gray-600">{module.keywords.join(', ')}</p>
-        </div>
-
-        <h4 className="font-semibold text-gray-700 mb-2">Course Outcomes:</h4>
-
-        <ul className="space-y-3">
-          {module.outcomes.map((oc, idx) => (
-            <li
-              key={idx}
-              className="flex items-start space-x-3 bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 p-4 rounded-xl border border-[#BBDCE5]/30 shadow-sm"
-            >
-              <span className="w-6 h-6 flex items-center justify-center bg-[#BBDCE5] text-white font-semibold rounded-full">
-                {idx + 1}
-              </span>
-              <p className="text-gray-800 leading-relaxed">
-                <strong>[{oc.bloom_level}]</strong> {oc.outcome}
-              </p>
-            </li>
-          ))}
-        </ul>
-      </div>
-    ))}
-  </div>
-)}
-
-    </div>
-  </div>
-)}
+                      {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
+                        <div className="space-y-6">
+                          {courseOutcomes.map((module, moduleIndex) => (
+                            <div key={moduleIndex} className="bg-gradient-to-br from-white to-[#ECEEDF]/30 p-6 rounded-xl shadow-md border border-[#D9C4B0]/40">
+                              <h3 className="text-xl font-bold text-gray-900 mb-3">
+                                Module {module.module_id}: {module.title}
+                              </h3>
+                              <div className="mb-4 p-3 bg-[#BBDCE5]/10 rounded-lg border border-[#BBDCE5]/20">
+                                <h4 className="font-semibold text-gray-700 text-sm mb-1.5">Keywords</h4>
+                                <p className="text-gray-600 text-sm">{module.keywords.join(', ')}</p>
+                              </div>
+                              <h4 className="font-semibold text-gray-700 mb-3">Course Outcomes</h4>
+                              <ul className="space-y-3">
+                                {module.outcomes.map((oc, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="flex items-start gap-3 bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 p-4 rounded-lg border border-[#BBDCE5]/30"
+                                  >
+                                    <span className="w-7 h-7 flex items-center justify-center bg-[#BBDCE5] text-white text-sm font-semibold rounded-full flex-shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    <p className="text-gray-800 leading-relaxed text-sm">
+                                      <span className="font-semibold text-[#5da8bd]">[{oc.bloom_level}]</span> {oc.outcome}
+                                    </p>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 p-16 text-center">
