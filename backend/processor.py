@@ -1,3 +1,4 @@
+from asyncio.log import logger
 import os
 import requests
 import json
@@ -28,25 +29,41 @@ TEXT_CHUNK_SIZE = 4000
 
 
 class SyllabusProcessor:
+      # def __init__(self):
+      #   """
+      #   Initializes the processor, loading the Groq API key from environment variables.
+      #   """
+      #   # For Google Colab, it's better to use the userdata library
+      #   try:
+      #       self.api_key = os.getenv("GROQ_API_KEY")
+      #       if not self.api_key:
+      #            # Fallback for local dev if Colab-specific method fails
+                 
+      #            self.api_key = os.getenv("GROQ_API_KEY")
+      #       print("Loaded GROQ_API_KEY from Colab Secrets.")
+      #   except (ImportError, KeyError):
+      #       self.api_key = os.getenv("GROQ_API_KEY")
+ 
       def __init__(self):
         """
         Initializes the processor, loading the Groq API key from environment variables.
         """
-        # For Google Colab, it's better to use the userdata library
-        try:
-            self.api_key = os.getenv("GROQ_API_KEY")
-            if not self.api_key:
-                 # Fallback for local dev if Colab-specific method fails
-                 
-                 self.api_key = os.getenv("GROQ_API_KEY")
-            print("Loaded GROQ_API_KEY from Colab Secrets.")
-        except (ImportError, KeyError):
-            self.api_key = os.getenv("GROQ_API_KEY")
-            if self.api_key:
-                print("Loaded GROQ_API_KEY from .env file.")
-            else:
-                 raise ValueError("GROQ_API_KEY not found. Please set it in Colab Secrets or a .env file.")
-
+        # Load API key from environment
+        self.api_key = os.getenv("GROQ_API_KEY")
+        
+        # Validate key exists
+        if not self.api_key:
+            raise ValueError(
+                "GROQ_API_KEY not found in environment. "
+                "Set it via: export GROQ_API_KEY='your-key'"
+            )
+        
+        # Validate key format (Groq keys start with 'gsk_')
+        if not self.api_key.startswith('gsk_'):
+            raise ValueError("Invalid GROQ_API_KEY format. Groq keys should start with 'gsk_'")
+        
+        # Log initialization (don't reveal key or source)
+        logger.info("SyllabusProcessor initialized successfully")
         print("SyllabusProcessor initialized with Groq API.")
 
 
@@ -114,7 +131,7 @@ class SyllabusProcessor:
             doc = fitz.open(pdf_path)
         except Exception as e:
             raise Exception(f"Error opening {pdf_path} with PyMuPDF: {e}")
-        print("Step 1: Attempting general block extraction...")
+        logger.info("Step 1: Attempting general block extraction...")
         text, success = self._extract_text_with_block_detection(doc)
         if success:
             print("General block extraction successful.")

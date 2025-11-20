@@ -737,6 +737,11 @@ def generate_outcomes():
     """
     Generate course outcomes from processed modules.
     Query param: session_id (string)
+
+    - Reads modules from DATA_FOLDER/{session_id}.json
+    - Adds module_id indices
+    - Uses analyser.generate_outcomes_per_module(...) for per-module COs
+    - Uses analyser.aggregate_course_outcomes(...) for TOTAL course outcomes
     """
     if request.method == 'OPTIONS':
         return jsonify({'status': 'OK'}), 200
@@ -754,18 +759,46 @@ def generate_outcomes():
         }), 404
 
     try:
+        # 1) Load processed syllabus results
         with open(result_path, 'r', encoding='utf-8') as f:
             results = json.load(f)
-        modules = results.get('modules', [])
-        if not modules:
+
+        raw_modules = results.get('modules', [])
+        if not raw_modules:
             return jsonify({
                 'success': False,
                 'error': 'No modules available in results'
             }), 400
 
-        outcomes = analyser.generate_outcomes_per_module(modules)
-        # Print formatted results in terminal
-        analyser.print_generated_outcomes(outcomes)
+        # 2) Normalize modules: add module_id, ensure content & title
+        modules = []
+        for idx, m in enumerate(raw_modules, start=1):
+            modules.append({
+                "module_id": idx,
+                "title": m.get("title") or f"Module {idx}",
+                "content": m.get("content") or m.get("module_content", "")
+            })
+
+        # 3) Generate outcomes per module (graph + TF-IDF + Keras/TFLite Bloom)
+        module_outcomes = analyser.generate_outcomes_per_module(modules)
+
+        # 4) Aggregate TOTAL course outcomes across all modules (if available)
+        if hasattr(analyser, "aggregate_course_outcomes"):
+            course_outcomes = analyser.aggregate_course_outcomes(module_outcomes, top_n=None)
+        else:
+            # Simple fallback: just flatten all module outcomes
+            course_outcomes = []
+            for mod in module_outcomes:
+                mid = mod.get("module_id")
+                for oc in mod.get("outcomes", []):
+                    entry = oc.copy()
+                    entry["modules"] = [mid]
+                    course_outcomes.append(entry)
+
+        # 5) Optional pretty prints to terminal
+        analyser.print_generated_outcomes(module_outcomes)
+        if hasattr(analyser, "print_total_course_outcomes"):
+            analyser.print_total_course_outcomes(course_outcomes)
 
         logger.info(f"Generated outcomes for session {session_id}")
 
@@ -773,15 +806,17 @@ def generate_outcomes():
             'success': True,
             'session_id': session_id,
             'models_loaded': getattr(analyser, "MODELS_LOADED", False),
-            'outcomes': outcomes,
-            'course_outcomes': outcomes
+            'module_outcomes': module_outcomes,
+            'course_outcomes': course_outcomes
         }), 200
+
     except Exception as e:
         logger.exception("Error generating outcomes")
         return jsonify({
             'success': False,
             'error': f'Failed to generate outcomes: {str(e)}'
         }), 500
+
 
 # HEALTH CHECK & ROOT ROUTES
 

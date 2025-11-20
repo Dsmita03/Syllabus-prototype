@@ -1,6 +1,9 @@
 # models/train_bloom_keras_tflite.py
-# (Now: trains and saves a Keras text classifier + tokenizer + label encoder.
-#  We are NOT converting to TFLite here.)
+# Trains and saves:
+#   - Keras text classifier (.keras)
+#   - TFLite version (.tflite) for CPU-friendly "lite" inference
+#   - Tokenizer (tokenizer.pkl)
+#   - LabelEncoder (label_encoder.pkl)
 
 import os
 import numpy as np
@@ -16,9 +19,9 @@ random.seed(42)
 np.random.seed(42)
 tf.random.set_seed(42)
 
-# =======================
+ 
 # 1. Training data
-# =======================
+
 training_keywords = [
     "software project planning",
     "project scheduling",
@@ -37,34 +40,34 @@ training_keywords = [
 ]
 
 training_labels = [
-    "Understanding",   # software project planning
-    "Applying",        # project scheduling
-    "Applying",        # gantt chart
-    "Applying",        # pert chart
-    "Analyzing",       # critical path
-    "Understanding",   # configuration management
-    "Analyzing",       # cost estimation
-    "Analyzing",       # cocomo
-    "Analyzing",       # fpa
-    "Remembering",     # version control
-    "Applying",        # linked list
-    "Applying",        # stack/queue
-    "Analyzing",       # db normalization
-    "Understanding",   # ml basics
+    "Understanding",    
+    "Applying",         
+    "Applying",        
+    "Applying",         
+    "Analyzing",       
+    "Understanding",    
+    "Analyzing",       
+    "Analyzing",       
+    "Analyzing",       
+    "Remembering",     
+    "Applying",        
+    "Applying",         
+    "Analyzing",        
+    "Understanding",    
 ]
 
 assert len(training_keywords) == len(training_labels)
 
-# =======================
+ 
 # 2. Encode labels
-# =======================
+ 
 label_encoder = LabelEncoder()
 y = label_encoder.fit_transform(training_labels)
 num_classes = len(label_encoder.classes_)
 
-# =======================
+ 
 # 3. Tokenize text
-# =======================
+ 
 MAX_VOCAB_SIZE = 5000
 MAX_LEN = 10  # MUST match analyser.py
 
@@ -80,9 +83,9 @@ X = keras.preprocessing.sequence.pad_sequences(
     padding="post"
 )
 
-# =======================
+ 
 # 4. Build Keras model
-# =======================
+ 
 model = keras.Sequential([
     layers.Embedding(input_dim=MAX_VOCAB_SIZE, output_dim=32, input_length=MAX_LEN),
     layers.GlobalAveragePooling1D(),
@@ -99,9 +102,8 @@ model.compile(
 model.summary()
 model.fit(X, y, epochs=60, batch_size=4, verbose=1)
 
-# =======================
-# 5. Save assets (Keras + tokenizer + labels)
-# =======================
+# 5. Save Keras assets
+ 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -115,9 +117,25 @@ with open(os.path.join(MODELS_DIR, "tokenizer.pkl"), "wb") as f:
 with open(os.path.join(MODELS_DIR, "label_encoder.pkl"), "wb") as f:
     pickle.dump(label_encoder, f)
 
-print("✅ Exported:")
+print("Exported Keras model and assets:")
 print(f" - {keras_model_path}")
 print(f" - {os.path.join(MODELS_DIR, 'tokenizer.pkl')}")
 print(f" - {os.path.join(MODELS_DIR, 'label_encoder.pkl')}")
 print("Label classes:", list(label_encoder.classes_))
 print("MAX_LEN used:", MAX_LEN)
+
+# 6. Convert to TFLite (Keras Lite)
+ 
+# tflite_model_path = os.path.join(MODELS_DIR, "bloom_keras_model.tflite")
+
+# converter = tf.lite.TFLiteConverter.from_keras_model(model)
+
+# # Optional optimizations for smaller / faster model on CPU
+# converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+# tflite_model = converter.convert()
+# with open(tflite_model_path, "wb") as f:
+#     f.write(tflite_model)
+
+# print("Exported TFLite model:")
+# print(f" - {tflite_model_path}")

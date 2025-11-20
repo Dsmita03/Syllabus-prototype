@@ -34,17 +34,12 @@ interface Module {
   }>;
 }
 
-interface Outcome {
+interface TotalOutcome {
   keyword: string;
   bloom_level: string;
   outcome: string;
-}
-
-interface ModuleOutcome {
-  module_id: number;
-  title: string;
-  keywords: string[];
-  outcomes: Outcome[];
+  importance_score?: number;
+  modules?: number[];
 }
 
 export default function ResultsPage() {
@@ -56,7 +51,7 @@ export default function ResultsPage() {
   const [bookmarkedModules, setBookmarkedModules] = useState<Set<string>>(new Set());
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [courseOutcomes, setCourseOutcomes] = useState<ModuleOutcome[]>([]);
+  const [totalCourseOutcomes, setTotalCourseOutcomes] = useState<TotalOutcome[]>([]);
   const [isGeneratingOutcomes, setIsGeneratingOutcomes] = useState(false);
   const [outcomeError, setOutcomeError] = useState<string>('');
 
@@ -93,10 +88,12 @@ export default function ResultsPage() {
 
     setIsGeneratingOutcomes(true);
     setOutcomeError('');
-    setCourseOutcomes([]);
+    setTotalCourseOutcomes([]);
 
     try {
       const apiUrl = `http://localhost:5001/api/generate_outcomes?session_id=${sessionId}`;
+      console.log('Fetching outcomes from:', apiUrl);
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
@@ -105,13 +102,61 @@ export default function ResultsPage() {
       });
 
       const data = await response.json();
+      console.log('Backend response:', JSON.stringify(data, null, 2));
+      console.log('Success:', data.success);
 
-      if (response.ok && data.success && data.course_outcomes) {
-        setCourseOutcomes(data.course_outcomes);
+      if (response.ok && data.success) {
+        if (data.course_outcomes && Array.isArray(data.course_outcomes)) {
+          console.log('Course outcomes received:', data.course_outcomes.length);
+          
+          // Group outcomes by module
+          const outcomesByModule = new Map<number, TotalOutcome[]>();
+          data.course_outcomes.forEach((outcome: TotalOutcome) => {
+            if (outcome.modules && outcome.modules.length > 0) {
+              const moduleId = outcome.modules[0];
+              if (!outcomesByModule.has(moduleId)) {
+                outcomesByModule.set(moduleId, []);
+              }
+              outcomesByModule.get(moduleId)!.push(outcome);
+            }
+          });
+
+          // Select the best outcome from each module
+          const selectedOutcomes: TotalOutcome[] = [];
+          const sortedModules = Array.from(outcomesByModule.keys()).sort((a, b) => a - b);
+          
+          for (const moduleId of sortedModules) {
+            const moduleOutcomes = outcomesByModule.get(moduleId)!;
+            const bestOutcome = moduleOutcomes.sort((a, b) => 
+              (b.importance_score || 0) - (a.importance_score || 0)
+            )[0];
+            
+            // Clean up the outcome text
+            const cleanedOutcome = {
+              ...bestOutcome,
+              outcome: bestOutcome.outcome
+                .replace(/^Upon completion of this course, students will be able to:\n?/i, '')
+                .replace(/^- /gm, '')
+                .trim()
+            };
+            
+            selectedOutcomes.push(cleanedOutcome);
+          }
+
+          const finalOutcomes = selectedOutcomes.slice(0, 6);
+          
+          console.log(`Selected ${finalOutcomes.length} outcomes (1 per module)`);
+          setTotalCourseOutcomes(finalOutcomes);
+        } else {
+          console.error(' No course_outcomes in response');
+          setOutcomeError('No course outcomes received from backend.');
+        }
       } else {
+        console.error(' API Error:', data.error);
         setOutcomeError(data.error || 'Failed to generate course outcomes from API.');
       }
     } catch (err) {
+      console.error(' Network Error:', err);
       setOutcomeError('Network error occurred while generating outcomes.');
     } finally {
       setIsGeneratingOutcomes(false);
@@ -234,8 +279,14 @@ export default function ResultsPage() {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-md flex-shrink-0">
-                <Image src="/logo.png" alt="EduModule Logo" width={40} height={40} className="object-contain" />
+              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-md flex-shrink-0 relative">
+                <Image 
+                  src="/logo.png" 
+                  alt="EduModule Logo" 
+                  width={40} 
+                  height={40} 
+                  className="object-contain"
+                />
               </div>
               <h1 className="text-lg font-semibold text-gray-800 tracking-wide">EduModule</h1>
             </div>
@@ -256,14 +307,13 @@ export default function ResultsPage() {
           {/* Left Sidebar - Module List */}
           <aside className="md:col-span-5 lg:col-span-5">
             <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 sticky top-24">
-              {/* Module List Header */}
               <div className="p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                <div>
+                <div className="w-full">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xl font-bold text-gray-900">Modules</h2>
                     <span className="px-3 py-1 bg-[#BBDCE5] text-white text-sm font-semibold rounded-full">{modules.length}</span>
                   </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-30">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <p className="text-gray-600 text-sm">Select a module to view content</p>
                     <button
                       onClick={handlePrint}
@@ -277,7 +327,6 @@ export default function ResultsPage() {
                 </div>
               </div>
 
-              {/* Module Cards */}
               <div className="p-4 space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto">
                 {modules.map((module, index) => (
                   <ModuleCard
@@ -288,8 +337,6 @@ export default function ResultsPage() {
                     index={index}
                     isCompleted={completedModules.has(module.id)}
                     isBookmarked={bookmarkedModules.has(module.id)}
-                    onBookmark={() => toggleBookmark(module.id)}
-                    onComplete={() => markAsCompleted(module.id)}
                   />
                 ))}
               </div>
@@ -332,7 +379,7 @@ export default function ResultsPage() {
                         {currentModule.questions && currentModule.questions.length > 0 && (
                           <button
                             onClick={() => router.push(`/quiz?moduleId=${currentModule.id}`)}
-                            className="flex items-center px-4 py-2 bg-[#BBDCE5] text-white rounded-lg hover:bg-[#a5cfd8] transition-colors font-medium"
+                            className="flex items-center gap-2 px-4 py-2 bg-[#BBDCE5] text-white rounded-lg hover:bg-[#a5cfd8] transition-colors font-medium"
                           >
                             <Play className="w-4 h-4" />
                             Start Quiz
@@ -340,7 +387,7 @@ export default function ResultsPage() {
                         )}
                         <button
                           onClick={() => markAsCompleted(currentModule.id)}
-                          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors border ${
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border ${
                             completedModules.has(currentModule.id)
                               ? 'bg-green-100 text-green-700 border-green-200'
                               : 'bg-[#ECEEDF] text-gray-700 hover:bg-green-100 hover:text-green-700 border-[#D9C4B0]/30 hover:border-green-200'
@@ -351,7 +398,7 @@ export default function ResultsPage() {
                         </button>
                         <button
                           onClick={() => toggleBookmark(currentModule.id)}
-                          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors border ${
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors border ${
                             bookmarkedModules.has(currentModule.id)
                               ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
                               : 'bg-[#ECEEDF] text-gray-700 hover:bg-yellow-100 hover:text-yellow-700 border-[#D9C4B0]/30 hover:border-yellow-200'
@@ -363,10 +410,10 @@ export default function ResultsPage() {
                         <button
                           onClick={handleGenerateOutcomes}
                           disabled={isGeneratingOutcomes || !modules.length}
-                          className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors shadow-sm ${
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm ${
                             isGeneratingOutcomes
                               ? 'bg-gray-400 text-white cursor-not-allowed border-gray-400'
-                              : 'bg-gradient-to-r  bg-[#5da8bd]  to-indigo-400 text-white  hover:bg-[#71a9b8] hover:to-indigo-700 border-transparent'
+                              : 'bg-[#5da8bd] text-white hover:bg-[#71a9b8] border-transparent'
                           }`}
                         >
                           {isGeneratingOutcomes ? (
@@ -380,6 +427,7 @@ export default function ResultsPage() {
                     </div>
                   </div>
                 </div>
+                
                 {/* Module Content */}
                 <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30">
                   <div className="flex items-center gap-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
@@ -390,61 +438,79 @@ export default function ResultsPage() {
                   </div>
                   <div className="p-6">
                     <div className="bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 rounded-xl p-6 border border-[#BBDCE5]/30">
-                      <p className="text-gray-700 leading-relaxed text-lg">{currentModule.content}</p>
+                      <p className="text-gray-700 leading-relaxed text-lg whitespace-pre-wrap">{currentModule.content}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Course Outcomes Section */}
-                {(isGeneratingOutcomes || courseOutcomes.length > 0 || outcomeError) && (
-                  <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 mt-6">
-                    <div className="flex items-center gap-3 p-6 border-b border-[#D9C4B0]/30 bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20">
-                      <div className="w-10 h-10 bg-gradient-to-br bg-[#5da8bd] hover:bg-[#71a9b8] rounded-lg flex items-center justify-center">
-                        <Award className="w-5 h-5 text-white" />
+                {/* Course Outcomes Section - Matching Website Design */}
+                {(isGeneratingOutcomes || totalCourseOutcomes.length > 0 || outcomeError) && (
+                  <div className="bg-white rounded-2xl shadow-lg border border-[#D9C4B0]/30 overflow-hidden">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-[#ECEEDF]/50 to-[#BBDCE5]/20 p-6 border-b border-[#D9C4B0]/30">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 bg-gradient-to-br from-[#5da8bd] to-[#71a9b8] rounded-xl flex items-center justify-center shadow-sm">
+                          <Award className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-bold text-gray-900">Course Outcomes</h4>
+                          <p className="text-sm text-gray-600 mt-0.5">
+                            On completion of the course, the student will be able to
+                          </p>
+                        </div>
                       </div>
-                      <h4 className="text-xl font-bold text-gray-900">AI-Generated Course Outcomes</h4>
                     </div>
+
+                    {/* Content */}
                     <div className="p-6">
                       {isGeneratingOutcomes && (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-                          <span className="text-gray-700 text-lg font-medium ml-3">Generating outcomes...</span>
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-7 h-7 text-[#5da8bd] animate-spin" />
+                          <span className="text-gray-700 text-base font-medium ml-3">Generating outcomes...</span>
                         </div>
                       )}
 
                       {outcomeError && (
-                        <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-200">
+                        <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-200">
                           ⚠️ {outcomeError}
                         </div>
                       )}
 
-                      {!isGeneratingOutcomes && courseOutcomes.length > 0 && (
-                        <div className="space-y-6">
-                          {courseOutcomes.map((module, moduleIndex) => (
-                            <div key={moduleIndex} className="bg-gradient-to-br from-white to-[#ECEEDF]/30 p-6 rounded-xl shadow-md border border-[#D9C4B0]/40">
-                              <h3 className="text-xl font-bold text-gray-900 mb-3">
-                                Module {module.module_id}: {module.title}
-                              </h3>
-                              <div className="mb-4 p-3 bg-[#BBDCE5]/10 rounded-lg border border-[#BBDCE5]/20">
-                                <h4 className="font-semibold text-gray-700 text-sm mb-1.5">Keywords</h4>
-                                <p className="text-gray-600 text-sm">{module.keywords.join(', ')}</p>
-                              </div>
-                              <h4 className="font-semibold text-gray-700 mb-3">Course Outcomes</h4>
-                              <ul className="space-y-3">
-                                {module.outcomes.map((oc, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="flex items-start gap-3 bg-gradient-to-r from-[#ECEEDF]/60 to-[#BBDCE5]/20 p-4 rounded-lg border border-[#BBDCE5]/30"
-                                  >
-                                    <span className="w-7 h-7 flex items-center justify-center bg-[#BBDCE5] text-white text-sm font-semibold rounded-full flex-shrink-0">
-                                      {idx + 1}
+                      {!isGeneratingOutcomes && totalCourseOutcomes.length > 0 && (
+                        <div className="space-y-5">
+                          {totalCourseOutcomes.map((outcome, index) => (
+                            <div
+                              key={index}
+                              className="group bg-white border-2 border-[#BBDCE5]/30 rounded-xl p-5 hover:border-[#5da8bd]/50 hover:shadow-md transition-all duration-200"
+                            >
+                              <div className="flex items-start gap-4">
+                                {/* CO Badge */}
+                                <div className="flex-shrink-0">
+                                  <div className="w-14 h-14 bg-gradient-to-br from-[#BBDCE5]/20 to-[#5da8bd]/10 border-2 border-[#5da8bd]/30 rounded-xl flex items-center justify-center group-hover:border-[#5da8bd]/50 transition-colors">
+                                    <span className="text-[#5da8bd] font-bold text-base">CO-{index + 1}</span>
+                                  </div>
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                  {/* Tags */}
+                                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                                    <span className="px-3 py-1.5 bg-[#BBDCE5]/20 text-[#5da8bd] border border-[#BBDCE5] rounded-lg text-xs font-semibold">
+                                      {outcome.bloom_level}
                                     </span>
-                                    <p className="text-gray-800 leading-relaxed text-sm">
-                                      <span className="font-semibold text-[#5da8bd]">[{oc.bloom_level}]</span> {oc.outcome}
-                                    </p>
-                                  </li>
-                                ))}
-                              </ul>
+                                    {/* {outcome.modules && outcome.modules.length > 0 && (
+                                      <span className="px-3 py-1.5 bg-[#D9C4B0]/20 text-[#b8a18c] border border-[#D9C4B0] rounded-lg text-xs font-medium">
+                                        Module {outcome.modules[0]}
+                                      </span>
+                                    )} */}
+                                  </div>
+
+                                  {/* Outcome Text */}
+                                  <p className="text-gray-700 leading-relaxed text-[15px] whitespace-pre-wrap">
+                                    {outcome.outcome}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
