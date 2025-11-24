@@ -29,20 +29,6 @@ TEXT_CHUNK_SIZE = 4000
 
 
 class SyllabusProcessor:
-      # def __init__(self):
-      #   """
-      #   Initializes the processor, loading the Groq API key from environment variables.
-      #   """
-      #   # For Google Colab, it's better to use the userdata library
-      #   try:
-      #       self.api_key = os.getenv("GROQ_API_KEY")
-      #       if not self.api_key:
-      #            # Fallback for local dev if Colab-specific method fails
-                 
-      #            self.api_key = os.getenv("GROQ_API_KEY")
-      #       print("Loaded GROQ_API_KEY from Colab Secrets.")
-      #   except (ImportError, KeyError):
-      #       self.api_key = os.getenv("GROQ_API_KEY")
  
       def __init__(self):
         """

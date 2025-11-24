@@ -104,10 +104,6 @@ def find_uploaded_file_by_id(prefix_id: str) -> str | None:
             return os.path.join(folder, fname)
     return None
  
-# BEGIN FIXED CODE BLOCK (updated gesture detection)
- 
-
-# BEGIN UPDATED CODE BLOCK
 
 # BEGIN FINAL GESTURE LOGIC
 

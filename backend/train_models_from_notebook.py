@@ -1,196 +1,16 @@
-# """
-# Train and export TF-IDF, SVM, and LabelEncoder models
-# for the Automated Course Outcome Extraction System.
-# """
-
-# import joblib
-# import pandas as pd
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.preprocessing import LabelEncoder
-# from sklearn.svm import SVC
-
-# # ======================================================
-# # 1️⃣ TRAINING DATA (You can expand this with your syllabus)
-# # ======================================================
-# data = [
-#     ("Define software engineering principles", "Remembering"),
-#     ("List different types of software process models", "Remembering"),
-#     ("Explain the need for version control", "Understanding"),
-#     ("Summarize the stages of the SDLC", "Understanding"),
-#     ("Use Git to manage source code", "Applying"),
-#     ("Apply testing methods on real projects", "Applying"),
-#     ("Analyze project risks in development", "Analyzing"),
-#     ("Differentiate between verification and validation", "Analyzing"),
-#     ("Evaluate software quality metrics", "Evaluating"),
-#     ("Critique a project's scheduling plan", "Evaluating"),
-#     ("Design a REST API using Flask", "Creating"),
-#     ("Develop a project plan for development", "Creating"),
-# ]
-
-# df = pd.DataFrame(data, columns=["text", "bloom_level"])
-
-# # ======================================================
-# # 2️⃣ ENCODE LABELS
-# # ======================================================
-# label_encoder = LabelEncoder()
-# y = label_encoder.fit_transform(df["bloom_level"])
-
-# # ======================================================
-# # 3️⃣ VECTORIZE TEXT (TF-IDF)
-# # ======================================================
-# vectorizer = TfidfVectorizer(stop_words="english")
-# X = vectorizer.fit_transform(df["text"])
-
-# # ======================================================
-# # 4️⃣ TRAIN MODEL ON FULL DATA
-# # ======================================================
-# # We train on full data to avoid small dataset split errors
-# model = SVC(kernel="linear", probability=True)
-# model.fit(X, y)
-
-# # ======================================================
-# # 5️⃣ SAVE TRAINED COMPONENTS
-# # ======================================================
-# joblib.dump(vectorizer, "tfidf_vectorizer.joblib")
-# joblib.dump(model, "svm_model.joblib")
-# joblib.dump(label_encoder, "label_encoder_level.joblib")
-
-# # ======================================================
-# # 6️⃣ VERIFY
-# # ======================================================
-# print("\n✅ Models trained and saved successfully!")
-# print("   - tfidf_vectorizer.joblib")
-# print("   - svm_model.joblib")
-# print("   - label_encoder_level.joblib")
-# print(f"\nClasses encoded: {list(label_encoder.classes_)}")
 
 """
 Train and export TF-IDF, SVM, and LabelEncoder models
 for the Automated Course Outcome Extraction System.
 
 This version improves:
-✅ Reproducibility
-✅ Model validation
-✅ File structure consistency with analyser.py
-✅ Extensibility for larger datasets
+  Reproducibility
+  Model validation
+  File structure consistency with analyser.py
+ Extensibility for larger datasets
 """
 
-# import os
-# import joblib
-# import pandas as pd
-# from sklearn.feature_extraction.text import TfidfVectorizer
-# from sklearn.preprocessing import LabelEncoder
-# from sklearn.svm import SVC
-# from sklearn.pipeline import Pipeline
-# from sklearn.model_selection import train_test_split
-# from sklearn.metrics import classification_report, accuracy_score
-
-# # ======================================================
-# # 1️⃣ TRAINING DATA — Expandable & Clear
-# # ======================================================
-
-# data = [
-#     # --- Remembering ---
-#     ("Define software engineering principles", "Remembering"),
-#     ("List different types of software process models", "Remembering"),
-#     ("State the purpose of documentation", "Remembering"),
-
-#     # --- Understanding ---
-#     ("Explain the need for version control", "Understanding"),
-#     ("Summarize the stages of the SDLC", "Understanding"),
-#     ("Describe the function of project management tools", "Understanding"),
-
-#     # --- Applying ---
-#     ("Use Git to manage source code", "Applying"),
-#     ("Apply testing methods on real projects", "Applying"),
-#     ("Implement version control using GitHub", "Applying"),
-
-#     # --- Analyzing ---
-#     ("Analyze project risks in development", "Analyzing"),
-#     ("Differentiate between verification and validation", "Analyzing"),
-#     ("Break down the phases of agile methodology", "Analyzing"),
-
-#     # --- Evaluating ---
-#     ("Evaluate software quality metrics", "Evaluating"),
-#     ("Critique a project's scheduling plan", "Evaluating"),
-#     ("Assess the effectiveness of software testing", "Evaluating"),
-
-#     # --- Creating ---
-#     ("Design a REST API using Flask", "Creating"),
-#     ("Develop a project plan for development", "Creating"),
-#     ("Construct a UML diagram for a system", "Creating"),
-# ]
-
-# df = pd.DataFrame(data, columns=["text", "bloom_level"])
-
-# # ======================================================
-# # 2️⃣ ENCODE LABELS
-# # ======================================================
-# label_encoder = LabelEncoder()
-# y = label_encoder.fit_transform(df["bloom_level"])
-
-# # ======================================================
-# # 3️⃣ TF-IDF + SVM PIPELINE
-# # ======================================================
-# vectorizer = TfidfVectorizer(
-#     stop_words="english",
-#     ngram_range=(1, 2),
-#     max_features=1000
-# )
-
-# model = SVC(kernel="linear", probability=True, random_state=42)
-
-# # Build pipeline for convenience
-# pipeline = Pipeline([
-#     ("tfidf", vectorizer),
-#     ("svm", model)
-# ])
-
-# # ======================================================
-# # 4️⃣ TRAIN/TEST SPLIT (for verification)
-# # ======================================================
-# # X_train, X_test, y_train, y_test = train_test_split(
-# #     df["text"], y, test_size=0.2, random_state=42, stratify=y
-# # )
-
-# # pipeline.fit(X_train, y_train)
-
-# # ⚙️ Train on full data (small dataset → no test split)
-# pipeline.fit(df["text"], y)
-# print("\n Model trained on full dataset (mock baseline).")
-
-
-# # ======================================================
-# # 5️⃣ VALIDATION REPORT
-# # ======================================================
-# # y_pred = pipeline.predict(X_test)
-# # print("\n📊 Model Evaluation Results:")
-# # print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
-# # print(f"✅ Accuracy: {accuracy_score(y_test, y_pred):.2f}")
-
-# y_pred = pipeline.predict(df["text"])
-# print("\n✅ Model trained successfully on all data.")
-
-
-# # ======================================================
-# # 6️⃣ EXPORT TRAINED COMPONENTS
-# # ======================================================
-# os.makedirs("models", exist_ok=True)
-
-# # Extract components for analyser.py compatibility
-# tfidf_vectorizer = pipeline.named_steps["tfidf"]
-# svm_model = pipeline.named_steps["svm"]
-
-# joblib.dump(tfidf_vectorizer, "models/tfidf_vectorizer.pkl")
-# joblib.dump(svm_model, "models/bloom_svm_model.pkl")
-# joblib.dump(label_encoder, "models/label_encoder.pkl")
-
-# print("\n✅ Models trained and exported successfully!")
-# print("   → models/tfidf_vectorizer.pkl")
-# print("   → models/bloom_svm_model.pkl")
-# print("   → models/label_encoder.pkl")
-
-# print(f"\n🧠 Encoded Bloom Levels: {list(label_encoder.classes_)}")
+ 
 
 """
 TRAIN BLOOM-LEVEL CLASSIFIER (Final Version)
@@ -219,9 +39,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 
 
-# ======================================================
-# 1️⃣ LOAD YOUR 80-LINE BLOOM DATASET
-# ======================================================
+ 
 
 data = [
 
@@ -321,26 +139,18 @@ data = [
 df = pd.DataFrame(data, columns=["text", "bloom_level"])
 
 
-# ======================================================
-# 2️⃣ LABEL ENCODING
-# ======================================================
 label_encoder = LabelEncoder()
 y = label_encoder.fit_transform(df["bloom_level"])
 
 
-# ======================================================
-# 3️⃣ TF-IDF VECTORIZER
-# ======================================================
+ 
 vectorizer = TfidfVectorizer(
     stop_words="english",
-    ngram_range=(1, 2),        # 🔥 bigrams improve accuracy
+    ngram_range=(1, 2),        
     max_features=2000
 )
 
-
-# ======================================================
-# 4️⃣ TRAIN/TEST SPLIT
-# ======================================================
+ 
 X_train, X_test, y_train, y_test = train_test_split(
     df["text"],
     y,
@@ -354,9 +164,7 @@ X_train_vec = vectorizer.fit_transform(X_train)
 X_test_vec = vectorizer.transform(X_test)
 
 
-# ======================================================
-# 5️⃣ TRAIN SVM CLASSIFIER
-# ======================================================
+ 
 model = SVC(
     kernel="linear",
     probability=True,
@@ -365,26 +173,22 @@ model = SVC(
 model.fit(X_train_vec, y_train)
 
 
-# ======================================================
-# 6️⃣ VALIDATION RESULTS
-# ======================================================
+ 
 y_pred = model.predict(X_test_vec)
 
-print("\n📊 BLOOM CLASSIFICATION REPORT:")
+print("\nBLOOM CLASSIFICATION REPORT:")
 print(classification_report(y_test, y_pred, target_names=label_encoder.classes_))
-print(f"🔥 Accuracy: {accuracy_score(y_test, y_pred):.4f}")
+print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
 
-
-# ======================================================
-# 7️⃣ SAVE ARTIFACTS
-# ======================================================
+ 
+ 
 os.makedirs("models", exist_ok=True)
 
 joblib.dump(vectorizer, "models/tfidf_vectorizer.pkl")
 joblib.dump(model, "models/bloom_svm_model.pkl")
 joblib.dump(label_encoder, "models/label_encoder.pkl")
 
-print("\n✅ Training Complete!")
+print("\nTraining Complete!")
 print("Saved:")
 print(" → models/tfidf_vectorizer.pkl")
 print(" → models/bloom_svm_model.pkl")
