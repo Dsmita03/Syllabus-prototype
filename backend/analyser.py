@@ -44,7 +44,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 nlp = spacy.load("en_core_web_sm")
 
 MODELS_LOADED = False
-USE_TFLITE = False
+USE_TFLITE = False 
 MAX_LEN = 10   
 
 MODEL = None
@@ -430,7 +430,7 @@ def generate_outcomes_per_module(modules):
             "keywords": keywords,
             "outcomes": outcomes
         })
-
+       
     return final_output
 
 # TOTAL COURSE OUTCOMES (aggregated across modules)
@@ -522,6 +522,7 @@ def print_total_course_outcomes(aggregated):
     print("----------------------------------------------------------------------------")
 
 
+# generate outcomes per module
 def print_generated_outcomes(result):
     print("\n=========== GENERATED OUTCOMES ===========\n")
     for module in result:

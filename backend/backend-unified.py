@@ -22,8 +22,17 @@ import mediapipe as mp
 import logging
 from processor import SyllabusProcessor
 import analyser
+import resource_finder
+from db.models.syllabus_model import Syllabus
+from db.models.module_model import Module
+from db.models.outcome_model import Outcome
+from db.models.user_model import User
+from db.models.resource_model import Resource
+from db.db import db
 
 app = Flask(__name__)
+
+
 
 # Get the absolute path of the directory containing this script
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -35,7 +44,14 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:raktim1234@localhost:5432/syllabus_ai"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# db connection and initialization
+db.init_app(app)
+
+with app.app_context():
+    db.create_all()
 # File Upload Configuration
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'syllabus_uploads')
@@ -777,6 +793,19 @@ def generate_outcomes():
 
         # 3) Generate outcomes per module (graph + TF-IDF + Keras/TFLite Bloom)
         module_outcomes = analyser.generate_outcomes_per_module(modules)
+        
+        # 3.5) Fetch learning resources per module
+        for mod in module_outcomes:
+
+            title = mod.get("title", "")
+            keywords = mod.get("keywords", [])
+
+            resources = resource_finder.get_resources_for_module(
+                title,
+                keywords
+            )
+
+            mod["resources"] = resources
 
         # 4) Aggregate TOTAL course outcomes across all modules (if available)
         if hasattr(analyser, "aggregate_course_outcomes"):
@@ -792,9 +821,9 @@ def generate_outcomes():
                     course_outcomes.append(entry)
 
         # 5) Optional pretty prints to terminal
-        analyser.print_generated_outcomes(module_outcomes)
-        if hasattr(analyser, "print_total_course_outcomes"):
-            analyser.print_total_course_outcomes(course_outcomes)
+        # analyser.print_generated_outcomes(module_outcomes)
+        # if hasattr(analyser, "print_total_course_outcomes"):
+        #     analyser.print_total_course_outcomes(course_outcomes)
 
         logger.info(f"Generated outcomes for session {session_id}")
 

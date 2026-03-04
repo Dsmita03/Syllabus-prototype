@@ -1,15 +1,61 @@
+# --------------------
+# Flask backend
+# --------------------
 Flask==2.3.3
-Flask-CORS==4.0.0
+Flask-Cors==4.0.0
 Flask-Login==0.6.3
-pypdf==5.9.0
-google-genai==0.3.0
-spacy==3.6.1
-python-multipart==0.0.6
+Flask-Session==0.8.0
 Werkzeug==2.3.7
-requests==2.31.0
-opencv-python==4.8.1.78
-numpy==1.24.3
-mediapipe==0.10.7
-Pillow==10.0.1
-python-dotenv==1.0.0
-pyttsx3==2.90
+requests==2.32.5
+python-dotenv==1.1.1
+python-multipart==0.0.6
+
+# --------------------
+# NLP (spaCy)
+# --------------------
+spacy==3.7.5
+# en-core-web-sm==3.6.0
+
+# --------------------
+# Computer Vision
+# --------------------
+numpy==1.26.4
+opencv-python==4.10.0.84
+mediapipe==0.10.14
+Pillow==11.3.0
+
+# --------------------
+# PDF / OCR
+# --------------------
+pypdf==5.9.0
+PyMuPDF==1.26.4
+pdf2image==1.17.0
+pytesseract==0.3.13
+
+# --------------------
+# Machine Learning
+# --------------------
+tensorflow==2.16.2
+keras==3.12.0
+sentencepiece==0.2.1
+scikit-learn==1.7.2
+scipy==1.15.3
+
+# --------------------
+# Utilities
+# --------------------
+pyttsx3==2.99
+rich==14.2.0
+
+# --------------------
+# Critical compatibility lock
+# --------------------
+protobuf==4.25.8
+
+networkx==3.5
+
+
+ddgs>=1.0.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+youtube-search-python>=1.6.6
