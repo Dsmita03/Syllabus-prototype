@@ -14,7 +14,7 @@ import time
 import threading
 import uuid
 from typing import Dict, Any, List
-from flask import Flask, Blueprint, request, jsonify, session
+from flask import Flask, Blueprint, request, jsonify, session, g
 from flask_cors import CORS, cross_origin
 from flask_session import Session
 from werkzeug.utils import secure_filename
@@ -29,10 +29,22 @@ from db.models.outcome_model import Outcome
 from db.models.user_model import User
 from db.models.resource_model import Resource
 from db.db import db
+from dotenv import load_dotenv
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity
+)
+import bcrypt
+from datetime import timedelta
+load_dotenv()
 
 app = Flask(__name__)
 
-
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "super-secret-key")
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
+jwt = JWTManager(app)
 
 # Get the absolute path of the directory containing this script
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -44,7 +56,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:raktim1234@localhost:5432/syllabus_ai"
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # db connection and initialization
@@ -587,262 +599,97 @@ def session_status():
 upload_bp = Blueprint('upload', __name__, url_prefix='/api/upload')
 
 
-@upload_bp.route('/', methods=['POST', 'OPTIONS'])
-@cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
-def upload_file():
-    """
-    Step 1: Handle file upload from frontend, save with UUID, return file_id.
-    This route now matches what FileUpload.tsx expects.
-    """
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200
+@upload_bp.route('', methods=['POST'])
+@jwt_required()
+def upload_file():  
 
     file = request.files.get('file')
-    if not file:
-        return jsonify({'success': False, 'error': 'No file provided'}), 400
 
-    if file.filename == '':
-        return jsonify({'success': False, 'error': 'No file selected'}), 400
+    user_id = get_jwt_identity()
 
-    if not allowed_file(file.filename):
-        return jsonify({'success': False, 'error': 'Invalid file type. Only PDF and TXT files allowed.'}), 400
+    file_id = str(uuid.uuid4())
+    filename = secure_filename(file.filename)
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{filename}")
 
-    try:
-        file_id = str(uuid.uuid4())
-        filename = secure_filename(file.filename)
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{filename}")
-        file.save(save_path)
+    file.save(save_path)
 
-        logger.info(f"File uploaded successfully: {filename} (ID: {file_id})")
+    # ✅ SAVE TO DB
+    syllabus = Syllabus(
+        id=file_id,
+        user_id=user_id,
+        title=filename,
+        pdf_url=save_path,
+        status="PROCESSING"
+    )
 
-        # This response is exactly what FileUpload.tsx expects
-        return jsonify({
-            'success': True,
-            'file_id': file_id,
-            'filename': filename,
-            'message': 'File uploaded successfully'
-        }), 200
-    except Exception:
-        logger.exception("Upload error")
-        return jsonify({'success': False, 'error': 'Failed to save file'}), 500
+    db.session.add(syllabus)
+    db.session.commit()
 
-# NEW ROOT ROUTES FOR 2-STEP PROCESSING
+    # ✅ START BACKGROUND PROCESS
+    threading.Thread(
+        target=process_syllabus_background,
+        args=(file_id, save_path)
+    ).start()
 
-
-@app.route('/api/process', methods=['POST', 'OPTIONS'])
-@cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
-def process_syllabus():
-    """
-    Step 2: Process the file identified by file_id.
-    This is called by the /processing page in the frontend.
-    """
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200
-
-    data = request.get_json(silent=True) or {}
-    file_id = data.get('file_id')
-
-    if not file_id:
-        return jsonify({'success': False, 'error': 'No file ID provided'}), 400
-
-    if file_id in PROCESSING_FILES:
-        logger.warning(f"Attempted to process an already processing file: {file_id}")
-        return jsonify({
-            'success': False,
-            'error': 'This file is already being processed. Please wait.'
-        }), 409
-
-    uploaded_file = find_uploaded_file_by_id(file_id)
-    if not uploaded_file:
-        return jsonify({'success': False, 'error': 'File not found'}), 404
-
-    try:
-        PROCESSING_FILES.add(file_id)
-        logger.info(f"Processing file: {uploaded_file}")
-
-        # Use the global processor instance
-        result = processor.process_syllabus(uploaded_file)
-
-        if not result.get('success'):
-            return jsonify({
-                'success': False,
-                'error': result.get('error', 'Processing failed')
-            }), 500
-
-        session_id = str(uuid.uuid4())
-        result.update({
-            'processed_at': time.time(),
-            'session_id': session_id,
-        })
-
-        result_path = os.path.join(DATA_FOLDER, f"{session_id}.json")
-        with open(result_path, 'w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
-
-        logger.info(
-            f"Processing completed. Session ID: {session_id}, Modules: {len(result.get('modules', []))}"
-        )
-
-        return jsonify({
-            'success': True,
-            'session_id': session_id,
-            'modules_count': len(result.get('modules', [])),
-            'message': 'Processing completed successfully'
-        }), 200
-
-    except Exception as e:
-        logger.exception("Processing error during main execution")
-        return jsonify({
-            'success': False,
-            'error': f'An unexpected error occurred: {str(e)}'
-        }), 500
-
-    finally:
-        if file_id in PROCESSING_FILES:
-            PROCESSING_FILES.remove(file_id)
-
-
-@app.route('/api/results', methods=['GET', 'OPTIONS'])
-@cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
-def get_results():
-    """
-    Step 3: Retrieve the processed results using the session_id.
-    """
-    if request.method == 'OPTIONS':
-        return jsonify({'status': 'OK'}), 200
-
-    session_id = request.args.get('session_id')
-    if not session_id:
-        return jsonify({'success': False, 'error': 'No session ID provided'}), 400
-
-    result_path = os.path.join(DATA_FOLDER, f"{secure_filename(session_id)}.json")
-    if not os.path.exists(result_path):
-        return jsonify({'success': False, 'error': 'Results not found'}), 404
-
-    try:
-        with open(result_path, 'r', encoding='utf-8') as f:
-            results = json.load(f)
-    except Exception:
-        logger.exception("Error reading results")
-        return jsonify({'success': False, 'error': 'Failed to read results'}), 500
-
-    logger.info(f"Results retrieved for session: {session_id}")
-
-    # Return the modules as expected by the frontend
     return jsonify({
-        'success': True,
-        'modules': results.get('modules', []),
-        'processed_at': results.get('processed_at'),
-        'total_modules': len(results.get('modules', []))
-    }), 200
+        "success": True,
+        "syllabus_id": file_id,
+        "message": "Uploaded successfully"
+    })
+   
 
+def process_syllabus_background(syllabus_id, file_path):
+    with app.app_context():   # ✅ FIX HERE
+        try:
+            result = processor.process_syllabus(file_path)
+
+            modules = result.get("modules", [])
+
+            for m in modules:
+                mod = Module(
+                    id=str(uuid.uuid4()),
+                    syllabus_id=syllabus_id,
+                    name=m.get("title"),
+                    content=m.get("content")
+                )
+                db.session.add(mod)
+
+            # ✅ mark completed
+            syllabus = Syllabus.query.get(syllabus_id)
+            syllabus.status = "COMPLETED"
+
+            db.session.commit()
+
+        except Exception as e:
+            print("BACKGROUND ERROR:", e)
+
+            syllabus = Syllabus.query.get(syllabus_id)
+            if syllabus:
+                syllabus.status = "FAILED"
+                db.session.commit()
 # REGISTER BLUEPRINTS
 app.register_blueprint(gesture_bp)
 app.register_blueprint(upload_bp)
 
-# Outcomes generation route
 
-
-@app.route('/api/generate_outcomes', methods=['GET', 'OPTIONS'])
+# User routes
+@app.route('/api/user', methods=['POST', 'OPTIONS'])
 @cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
-def generate_outcomes():
-    """
-    Generate course outcomes from processed modules.
-    Query param: session_id (string)
-
-    - Reads modules from DATA_FOLDER/{session_id}.json
-    - Adds module_id indices
-    - Uses analyser.generate_outcomes_per_module(...) for per-module COs
-    - Uses analyser.aggregate_course_outcomes(...) for TOTAL course outcomes
-    """
+# @require_auth
+# @jwt_required() it is needed to be added
+def sync_user():
     if request.method == 'OPTIONS':
         return jsonify({'status': 'OK'}), 200
 
-    session_id = request.args.get('session_id')
-    if not session_id:
-        return jsonify({'success': False, 'error': 'No session_id provided'}), 400
+    current_user = g.current_user
 
-    safe_id = secure_filename(session_id)
-    result_path = os.path.join(DATA_FOLDER, f"{safe_id}.json")
-    if not os.path.exists(result_path):
-        return jsonify({
-            'success': False,
-            'error': 'Results not found for provided session_id'
-        }), 404
-
-    try:
-        # 1) Load processed syllabus results
-        with open(result_path, 'r', encoding='utf-8') as f:
-            results = json.load(f)
-
-        raw_modules = results.get('modules', [])
-        if not raw_modules:
-            return jsonify({
-                'success': False,
-                'error': 'No modules available in results'
-            }), 400
-
-        # 2) Normalize modules: add module_id, ensure content & title
-        modules = []
-        for idx, m in enumerate(raw_modules, start=1):
-            modules.append({
-                "module_id": idx,
-                "title": m.get("title") or f"Module {idx}",
-                "content": m.get("content") or m.get("module_content", "")
-            })
-
-        # 3) Generate outcomes per module (graph + TF-IDF + Keras/TFLite Bloom)
-        module_outcomes = analyser.generate_outcomes_per_module(modules)
-        
-        # 3.5) Fetch learning resources per module
-        for mod in module_outcomes:
-
-            title = mod.get("title", "")
-            keywords = mod.get("keywords", [])
-
-            resources = resource_finder.get_resources_for_module(
-                title,
-                keywords
-            )
-
-            mod["resources"] = resources
-
-        # 4) Aggregate TOTAL course outcomes across all modules (if available)
-        if hasattr(analyser, "aggregate_course_outcomes"):
-            course_outcomes = analyser.aggregate_course_outcomes(module_outcomes, top_n=None)
-        else:
-            # Simple fallback: just flatten all module outcomes
-            course_outcomes = []
-            for mod in module_outcomes:
-                mid = mod.get("module_id")
-                for oc in mod.get("outcomes", []):
-                    entry = oc.copy()
-                    entry["modules"] = [mid]
-                    course_outcomes.append(entry)
-
-        # 5) Optional pretty prints to terminal
-        # analyser.print_generated_outcomes(module_outcomes)
-        # if hasattr(analyser, "print_total_course_outcomes"):
-        #     analyser.print_total_course_outcomes(course_outcomes)
-
-        logger.info(f"Generated outcomes for session {session_id}")
-
-        return jsonify({
-            'success': True,
-            'session_id': session_id,
-            'models_loaded': getattr(analyser, "MODELS_LOADED", False),
-            'module_outcomes': module_outcomes,
-            'course_outcomes': course_outcomes
-        }), 200
-
-    except Exception as e:
-        logger.exception("Error generating outcomes")
-        return jsonify({
-            'success': False,
-            'error': f'Failed to generate outcomes: {str(e)}'
-        }), 500
-
-
+    return jsonify({
+        "success": True,
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email
+        }
+    }), 200
 # HEALTH CHECK & ROOT ROUTES
 
 
@@ -869,9 +716,206 @@ def health_check():
         'timestamp': time.time()
     }), 200
 
+@app.route("/api/user/files", methods=["GET"])
+@jwt_required()
+def get_user_files():
+    try:
+        user_id = get_jwt_identity()
+
+        syllabi = Syllabus.query.filter_by(user_id=user_id).order_by(Syllabus.created_at.desc()).all()
+
+        result = []
+        for s in syllabi:
+            result.append({
+                "id": s.id,
+                "title": s.title,
+                "status": s.status,
+                "created_at": s.created_at.isoformat() if s.created_at else None
+            })
+
+        return jsonify({
+            "success": True,
+            "files": result
+        }), 200
+
+    except Exception as e:
+        print("ERROR fetching user files:", e)
+        return jsonify({
+            "success": False,
+            "error": "Failed to fetch files"
+        }), 500
+    
+# Additional routes for retrieving modules and outcomes (for testing/demo purposes)
+@app.route("/api/syllabus/<id>/modules")
+@jwt_required()
+def get_modules(id):
+    modules = Module.query.filter_by(syllabus_id=id).all()
+
+    return jsonify({
+        "success": True,
+        "modules": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "content": m.content
+            } for m in modules
+        ]
+    })
+
+@app.route("/api/syllabus/<id>/outcomes")
+@jwt_required()
+def get_outcomes(id):
+
+    existing = Outcome.query.filter_by(syllabus_id=id).first()
+
+    if existing:
+        return jsonify({"success": True, "outcomes": existing.outcomes})
+
+    modules = Module.query.filter_by(syllabus_id=id).all()
+
+    text = " ".join([m.content for m in modules if m.content])
+
+    keywords = analyser.extract_keywords(text)
+    bloom_map = analyser.map_keywords_to_bloom(keywords)
+    outcomes = analyser.generate_outcome_statements(bloom_map)
+
+    new_outcome = Outcome(
+        id=str(uuid.uuid4()),
+        syllabus_id=id,
+        outcomes=outcomes
+    )
+
+    db.session.add(new_outcome)
+    db.session.commit()
+
+    return jsonify({"success": True, "outcomes": outcomes})
+
+@app.route("/api/module/<id>/resources")
+@jwt_required()
+def get_resources(id):
+
+    existing = Resource.query.filter_by(module_id=id).all()
+
+    if existing:
+        return jsonify({
+            "success": True,
+            "resources": [{"title": r.title, "url": r.url} for r in existing]
+        })
+
+    module = Module.query.get(id)
+
+    results = resource_finder.search_web(module.name)
+
+    for r in results:
+        db.session.add(Resource(
+            id=str(uuid.uuid4()),
+            module_id=id,
+            title=r["title"],
+            url=r["url"],
+            type=r["source"]
+        ))
+
+    db.session.commit()
+
+    return jsonify({"success": True, "resources": results})
+
+@app.route("/api/syllabus/<id>", methods=["DELETE"])
+@jwt_required()
+def delete_syllabus(id):
+    try:
+        user_id = get_jwt_identity()
+
+        syllabus = Syllabus.query.filter_by(id=id, user_id=user_id).first()
+
+        if not syllabus:
+            return jsonify({
+                "success": False,
+                "error": "Syllabus not found"
+            }), 404
+
+        # 🔥 Delete resources → modules → outcomes → syllabus
+
+        modules = Module.query.filter_by(syllabus_id=id).all()
+
+        for m in modules:
+            Resource.query.filter_by(module_id=m.id).delete()
+
+        Module.query.filter_by(syllabus_id=id).delete()
+        Outcome.query.filter_by(syllabus_id=id).delete()
+
+        db.session.delete(syllabus)
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Syllabus deleted successfully"
+        })
+
+    except Exception as e:
+        print("DELETE ERROR:", e)
+        return jsonify({
+            "success": False,
+            "error": "Failed to delete syllabus"
+        }), 500
+#Auth routes (register/login) - simplified for demonstration, no JWT or sessions yet
+@app.route("/api/auth/register", methods=["POST"])
+def register():
+    data = request.get_json()
+
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"success": False, "error": "Email and password required"}), 400
+
+    # check existing user
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        return jsonify({"success": False, "error": "User already exists"}), 400
+
+    # hash password
+    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+    user = User(
+        email=email,
+        password_hash=hashed_pw
+    )
+
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "User registered"})
+
+@app.route("/api/auth/login", methods=["POST"])
+def login():
+
+    data = request.get_json()
+
+    email = data.get("email")
+    password = data.get("password")
+
+    user = User.query.filter_by(email=email).first()
+
+    if not user:
+        return jsonify({"success": False, "error": "Invalid credentials"}), 401
+
+    # check password
+    if not bcrypt.checkpw(password.encode("utf-8"), user.password_hash.encode("utf-8")):
+        return jsonify({"success": False, "error": "Invalid credentials"}), 401
+
+    # create JWT token
+    access_token = create_access_token(identity=user.id)
+
+    return jsonify({
+        "success": True,
+        "token": access_token,
+        "user": {
+            "id": user.id,
+            "email": user.email
+        }
+    })
+
 # ERROR HANDLERS
-
-
 @app.errorhandler(413)
 def request_entity_too_large(error):
     return jsonify({

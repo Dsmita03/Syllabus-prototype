@@ -1,9 +1,10 @@
 from db.db import db
+import uuid
 
 class Resource(db.Model):
     __tablename__ = "resources"
 
-    id = db.Column(db.String, primary_key=True)
+    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
 
     module_id = db.Column(
         db.String,
@@ -16,3 +17,5 @@ class Resource(db.Model):
     type = db.Column(db.String)
 
     extra_data = db.Column(db.JSON)
+
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
