@@ -857,6 +857,19 @@ def delete_syllabus(id):
             "success": False,
             "error": "Failed to delete syllabus"
         }), 500
+
+
+@app.route("/api/user/files/status", methods=["GET"])
+@jwt_required()
+@cross_origin(origins=['http://localhost:3000', 'http://localhost:3001'], supports_credentials=True)
+def get_processing_status():
+    user_id = get_jwt_identity()
+    processing = Syllabus.query.filter_by(user_id=user_id, status="PROCESSING").all()
+    return jsonify({
+        "has_processing": len(processing) > 0,
+        "files": [{"id": s.id, "status": s.status} for s in processing]
+    })
+
 #Auth routes (register/login) - simplified for demonstration, no JWT or sessions yet
 @app.route("/api/auth/register", methods=["POST"])
 def register():
